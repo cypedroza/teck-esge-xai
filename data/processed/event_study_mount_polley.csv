@@ -1,0 +1,2 @@
+Event,Year,Expected_Return_%,Actual_Return_%,Abnormal_Return_%,CAR_0_to_2_%,t_statistic,p_value,Significant
+Mount Polley Dam Breach,2014,-5.643674865408298,-65.67808367578192,-60.03440881037362,381.9236968210988,-3.2806746248468563,0.030481400640894663,Yes
