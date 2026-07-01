@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESGE Decision Support | Teck Resources 2001–2024</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg:        #0D1117;
+    --panel:     #161B22;
+    --panel2:    #1C2128;
+    --border:    #30363D;
+    --green:     #2EA043;
+    --green-glow:#39D353;
+    --teal:      #26C6DA;
+    --blue:      #388BFD;
+    --amber:     #E3B341;
+    --red:       #F85149;
+    --purple:    #A371F7;
+    --orange:    #F0883E;
+    --text:      #E6EDF3;
+    --muted:     #8B949E;
+    --card-h:    200px;
+    --font:      'DM Sans', sans-serif;
+    --mono:      'DM Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 15px; letter-spacing: -0.3px;
+  }
+  .header-logo span { color: var(--green-glow); }
+  .header-badge {
+    background: #1F2937; border: 1px solid var(--border);
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; color: var(--muted); font-family: var(--mono);
+  }
+  .header-right {
+    margin-left: auto; display: flex; align-items: center; gap: 12px;
+  }
+  .header-tag {
+    font-size: 12px; color: var(--muted);
+  }
+
+  /* ── NAV TABS ── */
+  .nav {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    display: flex;
+    gap: 2px;
+  }
+  .nav-btn {
+    background: none; border: none; color: var(--muted);
+    padding: 12px 18px; cursor: pointer;
+    font-family: var(--font); font-size: 13px; font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all .2s; white-space: nowrap;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .nav-btn:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  .nav-btn.active {
+    color: var(--green-glow);
+    border-bottom-color: var(--green-glow);
+    background: rgba(57,211,83,.06);
+  }
+  .nav-icon { font-size: 15px; }
+
+  /* ── PAGES ── */
+  .page { display: none; padding: 24px 28px; }
+  .page.active { display: block; }
+
+  /* ── KPI STRIP ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .kpi:hover { border-color: var(--green); }
+  .kpi::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent, var(--green));
+  }
+  .kpi-label { font-size: 11px; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 8px; }
+  .kpi-value { font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -1px; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+  /* ── CHART GRID ── */
+  .chart-grid { display: grid; gap: 16px; }
+  .grid-2  { grid-template-columns: 1fr 1fr; }
+  .grid-3  { grid-template-columns: 1fr 1fr 1fr; }
+  .grid-13 { grid-template-columns: 1fr 3fr; }
+  .grid-31 { grid-template-columns: 3fr 1fr; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .card-title {
+    font-size: 12px; font-weight: 600; letter-spacing: .5px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent, var(--green));
+    flex-shrink: 0;
+  }
+
+  .plot { width: 100%; }
+
+  /* ── SECTION TITLE ── */
+  .section-title {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .section-sub {
+    font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5;
+  }
+
+  /* ── STAT TABLE ── */
+  .stat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .stat-table th {
+    text-align: left; padding: 8px 10px;
+    color: var(--muted); font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+  }
+  .stat-table td { padding: 9px 10px; border-bottom: 1px solid rgba(48,54,61,.5); }
+  .stat-table tr:last-child td { border-bottom: none; }
+  .stat-table tr:hover td { background: rgba(255,255,255,.03); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 700;
+  }
+  .badge-green { background: rgba(46,160,67,.2); color: var(--green-glow); }
+  .badge-red   { background: rgba(248,81,73,.2); color: var(--red); }
+  .badge-grey  { background: rgba(139,148,158,.2); color: var(--muted); }
+
+  /* ── EVENT HIGHLIGHT ── */
+  .event-hero {
+    background: linear-gradient(135deg, rgba(248,81,73,.1), rgba(248,81,73,.03));
+    border: 1px solid rgba(248,81,73,.3);
+    border-radius: 12px; padding: 24px 28px;
+    margin-bottom: 18px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 20px;
+  }
+  .event-metric .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .event-metric .val { font-size: 28px; font-weight: 700; letter-spacing: -1px; }
+  .event-metric .val.neg { color: var(--red); }
+  .event-metric .val.pos { color: var(--green-glow); }
+  .event-metric .val.neu { color: var(--amber); }
+
+  /* ── FOOTER ── */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 16px 28px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--muted);
+  }
+
+  /* ── TOOLTIP NOTE ── */
+  .note {
+    background: rgba(227,179,65,.07);
+    border: 1px solid rgba(227,179,65,.25);
+    border-radius: 8px; padding: 10px 14px;
+    font-size: 12px; color: var(--amber);
+    margin-top: 14px; line-height: 1.5;
+  }
+
+  /* ── PILL TAGS ── */
+  .pill {
+    display: inline-block; padding: 3px 10px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+    margin: 2px;
+  }
+  .pill-e  { background: rgba(46,160,67,.15);  color: var(--green-glow); }
+  .pill-s  { background: rgba(56,139,253,.15);  color: var(--blue); }
+  .pill-g  { background: rgba(163,113,247,.15); color: var(--purple); }
+  .pill-ec { background: rgba(240,136,62,.15);  color: var(--orange); }
+
+  @media(max-width:900px) {
+    .grid-2, .grid-3, .grid-13, .grid-31, .event-hero { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-logo">
+    <svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="none" stroke="#39D353" stroke-width="1.5"/><path d="M6 14 L11 7 L16 14" stroke="#39D353" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="11" cy="7" r="1.5" fill="#39D353"/></svg>
+    ESGE&nbsp;<span>Decision Support</span>
+  </div>
+  <span class="header-badge">Teck Resources · TSX: TECK-B · 2001–2024</span>
+  <div class="header-right">
+    <span class="header-tag">Framework XAI-AHP-Gaussiano</span>
+    <span class="header-badge">USP/Esalq · MBA 2026</span>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-btn active" onclick="showPage('overview',this)"><span class="nav-icon">🏠</span>Overview</button>
+  <button class="nav-btn" onclick="showPage('xai',this)"><span class="nav-icon">🔍</span>XAI Explorer</button>
+  <button class="nav-btn" onclick="showPage('ahp',this)"><span class="nav-icon">🎯</span>AHP-Gaussiano</button>
+  <button class="nav-btn" onclick="showPage('event',this)"><span class="nav-icon">💥</span>Event Study</button>
+  <button class="nav-btn" onclick="showPage('bench',this)"><span class="nav-icon">📈</span>Benchmarking</button>
+</nav>
+
+<!-- ══════════════ PAGE 1 — OVERVIEW ══════════════ -->
+<div class="page active" id="page-overview">
+  <div class="section-title">Framework XAI-AHP-Gaussiano — ESGE Decision Support</div>
+  <div class="section-sub">Análise longitudinal de performance ESG da Teck Resources Limited (2001–2024) integrando Explainable AI com AHP probabilístico Monte Carlo.</div>
+
+  <div class="kpi-grid">
+    <div class="kpi" style="--accent:var(--green)">
+      <div class="kpi-label">Relatórios analisados</div>
+      <div class="kpi-value" style="color:var(--green-glow)">24</div>
+      <div class="kpi-sub">Anuais + Sustentabilidade</div>
+    </div>
+    <div class="kpi" style="--accent:var(--amber)">
+      <div class="kpi-label">Quebra TCFD — Chow F</div>
+      <div class="kpi-value" style="color:var(--amber)">53,94</div>
+      <div class="kpi-sub">p &lt; 0,0001 ***</div>
+    </div>
+    <div class="kpi" style="--accent:var(--green)">
+      <div class="kpi-label">ESG Δ pós-TCFD</div>
+      <div class="kpi-value" style="color:var(--green-glow)">+844%</div>
+      <div class="kpi-sub">vs média pré-2018</div>
+    </div>
+    <div class="kpi" style="--accent:var(--green)">
+      <div class="kpi-label">Peso Environmental</div>
+      <div class="kpi-value" style="color:var(--green-glow)">56,4%</div>
+      <div class="kpi-sub">AHP-Gaussiano · σ=0,10</div>
+    </div>
+    <div class="kpi" style="--accent:var(--red)">
+      <div class="kpi-label">Mount Polley AR</div>
+      <div class="kpi-value" style="color:var(--red)">−60%</div>
+      <div class="kpi-sub">p = 0,031 *</div>
+    </div>
+    <div class="kpi" style="--accent:var(--teal)">
+      <div class="kpi-label">SHAP-LIME convergência</div>
+      <div class="kpi-value" style="color:var(--teal)">r = 0,86</div>
+      <div class="kpi-sub">Triangulação forte</div>
+    </div>
+    <div class="kpi" style="--accent:var(--blue)">
+      <div class="kpi-label">Retorno médio Teck</div>
+      <div class="kpi-value" style="color:var(--blue)">48,2%</div>
+      <div class="kpi-sub">vs 16,4% TSX Mining</div>
+    </div>
+    <div class="kpi" style="--accent:var(--purple)">
+      <div class="kpi-label">P(CR &lt; 0,10)</div>
+      <div class="kpi-value" style="color:var(--purple)">98,8%</div>
+      <div class="kpi-sub">N=10.000 simulações</div>
+    </div>
+  </div>
+
+  <div class="chart-grid grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Quebra Estrutural — ESG Disclosure Index (Chow 2018)</div>
+      <div id="chow-chart" class="plot"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Resultado Chow Test por variável</div>
+      <div id="chow-bar" class="plot"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title"><span class="dot" style="background:var(--teal)"></span>Arquitetura do Framework — 5 Módulos Sequenciais</div>
+    <div id="framework-flow" class="plot"></div>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE 2 — XAI ══════════════ -->
+<div class="page" id="page-xai">
+  <div class="section-title">🔍 XAI Explorer — Triangulação SHAP · LIME · DiCE</div>
+  <div class="section-sub">Convergência entre três métodos XAI valida a estabilidade interpretativa do modelo. Correlação SHAP-LIME: <strong>r = 0,8580</strong> (convergência forte)</div>
+
+  <div class="chart-grid grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--blue)"></span>SHAP Global Feature Importance (Mean |SHAP|)</div>
+      <div id="shap-bar" class="plot"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--teal)"></span>XGBoost Feature Importance — Gain com IC 95%</div>
+      <div id="feat-bar" class="plot"></div>
+    </div>
+  </div>
+
+  <div class="chart-grid grid-2" style="margin-top:16px">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--purple)"></span>SHAP vs LIME — Comparação de Importância Normalizada</div>
+      <div id="shap-lime-chart" class="plot"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--orange)"></span>DiCE — Análise de Contrafactuais (What-If)</div>
+      <div id="dice-chart" class="plot"></div>
+      <div class="note">⚠️ As magnitudes elevadas dos contrafactuais DiCE refletem saturação do modelo com n=23. Resultados interpretados como análise exploratória.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE 3 — AHP ══════════════ -->
+<div class="page" id="page-ahp">
+  <div class="section-title">🎯 AHP-Gaussiano Monte Carlo</div>
+  <div class="section-sub">10.000 simulações propagam incerteza de julgamentos especialistas via distribuição Gaussiana (σ=0,10). <strong>P(CR&lt;0,10) = 98,78% · Rank reversal = 0%</strong></div>
+
+  <div class="chart-grid grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Distribuição de Pesos ESGE
+        <span class="pill pill-e">E: 56,4%</span>
+        <span class="pill pill-s">S: 26,3%</span>
+        <span class="pill pill-g">G: 11,8%</span>
+        <span class="pill pill-ec">Ec: 5,6%</span>
+      </div>
+      <div id="ahp-donut" class="plot"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--teal)"></span>Pesos com Intervalo de Confiança 95%</div>
+      <div id="ahp-ic" class="plot"></div>
+    </div>
+  </div>
+
+  <div class="chart-grid grid-2" style="margin-top:16px">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Sensibilidade P(CR&lt;0,10) por nível de incerteza σ</div>
+      <div id="ahp-cr" class="plot"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--purple)"></span>Estabilidade dos pesos por dimensão vs σ</div>
+      <div id="ahp-sens" class="plot"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title"><span class="dot"></span>Tabela Completa — Pesos AHP-Gaussiano</div>
+    <table class="stat-table" id="ahp-table"></table>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE 4 — EVENT STUDY ══════════════ -->
+<div class="page" id="page-event">
+  <div class="section-title">💥 Event Study — Desastre Mount Polley (2014)</div>
+  <div class="section-sub">Rompimento da barragem de rejeitos em 4 de agosto de 2014. Confirmação da <strong>materialidade financeira</strong> de falhas ESG catastróficas.</div>
+
+  <div class="event-hero">
+    <div class="event-metric">
+      <div class="label">Retorno Esperado</div>
+      <div class="val neu">−5,64%</div>
+    </div>
+    <div class="event-metric">
+      <div class="label">Retorno Observado</div>
+      <div class="val neg">−65,68%</div>
+    </div>
+    <div class="event-metric">
+      <div class="label">Retorno Anormal (AR)</div>
+      <div class="val neg">−60,03%</div>
+    </div>
+    <div class="event-metric">
+      <div class="label">CAR [0, +2 anos]</div>
+      <div class="val pos">+381,92%</div>
+    </div>
+  </div>
+
+  <div class="chart-grid grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--red)"></span>Retorno Anormal e Recuperação (2012–2017)</div>
+      <div id="event-bar" class="plot"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Decomposição: Retorno Esperado vs Anormal</div>
+      <div id="event-decomp" class="plot"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title"><span class="dot"></span>Parâmetros Estatísticos do Event Study</div>
+    <table class="stat-table">
+      <tr><th>Parâmetro</th><th>Valor</th><th>Status</th></tr>
+      <tr><td>Modelo de estimação</td><td>OLS Market Model</td><td><span class="badge badge-green">✓</span></td></tr>
+      <tr><td>Janela de estimação</td><td>252 trading days</td><td><span class="badge badge-green">✓</span></td></tr>
+      <tr><td>Retorno esperado (β×RMRKT)</td><td>−5,64%</td><td><span class="badge badge-grey">ref</span></td></tr>
+      <tr><td>Retorno observado</td><td>−65,68%</td><td><span class="badge badge-red">↓</span></td></tr>
+      <tr><td>Abnormal Return (AR)</td><td>−60,03%</td><td><span class="badge badge-red">sig</span></td></tr>
+      <tr><td>t-statistic</td><td>−3,2807</td><td><span class="badge badge-green">p&lt;0,05</span></td></tr>
+      <tr><td>p-value</td><td>0,0305</td><td><span class="badge badge-green">*</span></td></tr>
+      <tr><td>CAR [0, +2 anos]</td><td>+381,92%</td><td><span class="badge badge-green">recuperação</span></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE 5 — BENCHMARKING ══════════════ -->
+<div class="page" id="page-bench">
+  <div class="section-title">📈 Benchmarking — Teck Resources vs TSX Mining Index</div>
+  <div class="section-sub">Análise risco-retorno comparativa (2001–2024). Retorno superior acompanhado de volatilidade significativamente maior.</div>
+
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi" style="--accent:var(--blue)">
+      <div class="kpi-label">Teck — Retorno Médio</div>
+      <div class="kpi-value" style="color:var(--blue)">48,2%</div>
+      <div class="kpi-sub">+31,8 pp vs TSX</div>
+    </div>
+    <div class="kpi" style="--accent:var(--red)">
+      <div class="kpi-label">Teck — Volatilidade</div>
+      <div class="kpi-value" style="color:var(--red)">135,2%</div>
+      <div class="kpi-sub">+107,5 pp vs TSX</div>
+    </div>
+    <div class="kpi" style="--accent:var(--amber)">
+      <div class="kpi-label">Teck — Sharpe Ratio</div>
+      <div class="kpi-value" style="color:var(--amber)">0,335</div>
+      <div class="kpi-sub">vs 0,486 TSX</div>
+    </div>
+    <div class="kpi" style="--accent:var(--teal)">
+      <div class="kpi-label">Teck — Max Drawdown</div>
+      <div class="kpi-value" style="color:var(--teal)">−7,3%</div>
+      <div class="kpi-sub">vs −5,2% TSX</div>
+    </div>
+  </div>
+
+  <div class="chart-grid grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Comparação de Métricas Risco-Retorno</div>
+      <div id="bench-bar" class="plot"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Fronteira Risco-Retorno (tamanho = Sharpe Ratio)</div>
+      <div id="bench-scatter" class="plot"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Interpretação</div>
+    <p style="font-size:13px;line-height:1.7;color:var(--muted)">
+      A Teck entregou retorno médio de <strong style="color:var(--blue)">48,23%</strong> vs <strong style="color:var(--muted)">16,44%</strong> do TSX Mining Index,
+      porém com volatilidade de <strong style="color:var(--red)">135,16%</strong> vs <strong style="color:var(--muted)">27,67%</strong>.
+      O Sharpe Ratio inferior da Teck (<strong style="color:var(--amber)">0,335</strong> vs <strong style="color:var(--muted)">0,486</strong>) indica que o retorno adicional
+      não compensa o risco incremental em termos ajustados — evidência de que exposição ESG adicional
+      carrega prêmio de risco real não capturado por índices setoriais convencionais.
+    </p>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <span>Framework XAI-AHP-Gaussiano para Suporte a Tomada de Decisão em ESG &mdash; Cesar Yoshio Machado Pedroza · USP/Esalq · 2026</span>
+  <span>Orientador: Mestre Arthur Damasceno Vicente &nbsp;|&nbsp; <a href="https://github.com/cesarpedroza/tcc-xai-ahp-esge" style="color:var(--green-glow);text-decoration:none">GitHub ↗</a></span>
+</footer>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+const D = {
+  ahp_weights:[{"Criterion":"Environmental (E)","Mean":0.5638,"Std":0.01680,"CI_95_Lower":0.5293,"CI_95_Upper":0.5954,"CV_%":2.979},{"Criterion":"Social (S)","Mean":0.2625,"Std":0.01397,"CI_95_Lower":0.2358,"CI_95_Upper":0.2906,"CV_%":5.323},{"Criterion":"Governance (G)","Mean":0.1180,"Std":0.00718,"CI_95_Lower":0.1047,"CI_95_Upper":0.1326,"CV_%":6.088},{"Criterion":"Economic (Ec)","Mean":0.0557,"Std":0.00355,"CI_95_Lower":0.0493,"CI_95_Upper":0.0632,"CV_%":6.375}],
+  ahp_sens:[{"Sigma":0.05,"P(CR<0.10)_%":100.0,"E_Mean":0.5647,"S_Mean":0.2623,"G_Mean":0.1177,"Ec_Mean":0.0554},{"Sigma":0.10,"P(CR<0.10)_%":98.78,"E_Mean":0.5638,"S_Mean":0.2625,"G_Mean":0.1180,"Ec_Mean":0.0557},{"Sigma":0.15,"P(CR<0.10)_%":92.20,"E_Mean":0.5621,"S_Mean":0.2631,"G_Mean":0.1186,"Ec_Mean":0.0562},{"Sigma":0.20,"P(CR<0.10)_%":83.10,"E_Mean":0.5597,"S_Mean":0.2636,"G_Mean":0.1197,"Ec_Mean":0.0570}],
+  chow:[{"Feature":"Report Quality Score","Chow_F":2.22,"p_value":0.135,"Break":"Não","Delta_%":20.2},{"Feature":"ESG Disclosure Index","Chow_F":53.94,"p_value":0.0000000088,"Break":"Sim","Delta_%":844.5},{"Feature":"Close Price","Chow_F":3.77,"p_value":0.041,"Break":"Sim","Delta_%":89.3},{"Feature":"Market Liquidity","Chow_F":2.25,"p_value":0.132,"Break":"Não","Delta_%":-40.0},{"Feature":"Annual Return","Chow_F":0.26,"p_value":0.776,"Break":"Não","Delta_%":-79.8}],
+  feat_imp:[{"Feature":"Market Liquidity","Mean":0.8750,"Std":0.2081},{"Feature":"ESG Disclosure Index","Mean":0.0879,"Std":0.0438},{"Feature":"Annual Return","Mean":0.0080,"Std":0.0177},{"Feature":"Report Quality","Mean":0.0017,"Std":0.0012}],
+  shap_imp:[{"feature":"Market Liquidity","importance":192356.75},{"feature":"Annual Return","importance":101641.41},{"feature":"ESG Disclosure","importance":19359.35},{"feature":"Report Quality","importance":7205.09}],
+  shap_lime:[{"Feature":"Market Liquidity","SHAP":0.600,"LIME":0.867},{"Feature":"Annual Return","SHAP":0.317,"LIME":0.026},{"Feature":"ESG Disclosure","SHAP":0.060,"LIME":0.068},{"Feature":"Report Quality","SHAP":0.022,"LIME":0.039}],
+  dice:[{"Strategy":"ESG Disclosure +20%","Score":399100,"Feasibility":"Alta"},{"Strategy":"Report Quality +15%","Score":399100,"Feasibility":"Alta"},{"Strategy":"Combined +10% each","Score":399100,"Feasibility":"Média"}],
+  event:{"Expected":-5.64,"Actual":-65.68,"AR":-60.03,"CAR":381.92,"t":-3.28,"p":0.0305},
+  bench:[{"Metric":"Retorno Médio (%)","Teck":48.23,"TSX":16.44},{"Metric":"Volatilidade (%)","Teck":135.16,"TSX":27.67},{"Metric":"Sharpe Ratio","Teck":0.3346,"TSX":0.4857},{"Metric":"Max Drawdown (%)","Teck":-7.31,"TSX":-5.17}]
+};
+
+const C = {
+  green:'#39D353', teal:'#26C6DA', blue:'#388BFD',
+  amber:'#E3B341', red:'#F85149', purple:'#A371F7',
+  orange:'#F0883E', muted:'#8B949E', panel:'#161B22', border:'#30363D'
+};
+
+const LAYOUT_BASE = {
+  paper_bgcolor:'transparent', plot_bgcolor:'transparent',
+  font:{family:'DM Sans, sans-serif', color:'#E6EDF3', size:11},
+  margin:{t:10, b:40, l:10, r:10},
+  xaxis:{gridcolor:'#21262D', linecolor:'#30363D', zerolinecolor:'#30363D'},
+  yaxis:{gridcolor:'#21262D', linecolor:'#30363D', zerolinecolor:'#30363D'},
+  legend:{bgcolor:'transparent', bordercolor:'transparent'},
+  hoverlabel:{bgcolor:'#161B22', bordercolor:'#30363D', font:{color:'#E6EDF3'}},
+};
+
+const CFG = {responsive:true, displayModeBar:false};
+
+function layout(extra={}) { return Object.assign({}, LAYOUT_BASE, extra); }
+
+// ── PAGE SWITCHING ────────────────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  renderPage(id);
+}
+
+const rendered = {};
+function renderPage(id) {
+  if (rendered[id]) return;
+  rendered[id] = true;
+  const r = renders[id];
+  if (r) r();
+}
+
+// ── RENDERS ───────────────────────────────────────────────────────────────
+const renders = {
+
+  overview() {
+    // Chow timeline (simulated from means)
+    const years = Array.from({length:24}, (_,i) => 2001+i);
+    const preMean = 18.06, postMean = 170.57;
+    const seed = (n) => ((Math.sin(n)*9301+49297)%233280)/233280;
+    const pre  = years.filter(y=>y<2018).map((y,i)=>preMean  + (seed(i*7)-0.5)*preMean*0.4);
+    const post = years.filter(y=>y>=2018).map((y,i)=>postMean + (seed(i*13)-0.5)*postMean*0.15);
+
+    Plotly.newPlot('chow-chart', [
+      {x:years.filter(y=>y<2018), y:pre, mode:'lines+markers', name:'Pré-TCFD',
+       line:{color:C.muted,width:2}, marker:{size:6}},
+      {x:years.filter(y=>y>=2018), y:post, mode:'lines+markers', name:'Pós-TCFD',
+       line:{color:C.green,width:3}, marker:{size:8,symbol:'diamond'}},
+    ], layout({
+      height:260,
+      xaxis:{...LAYOUT_BASE.xaxis, title:'Ano'},
+      yaxis:{...LAYOUT_BASE.yaxis, title:'ESG Disclosure Index'},
+      legend:{...LAYOUT_BASE.legend, orientation:'h', y:-0.2},
+      shapes:[{type:'line', x0:2018, x1:2018, y0:0, y1:1, yref:'paper',
+               line:{color:C.amber, width:2, dash:'dash'}}],
+      annotations:[{x:2018.2, y:0.85, yref:'paper', text:'TCFD 2018<br>F=53,94***',
+                    showarrow:false, font:{color:C.amber, size:10},
+                    bgcolor:'rgba(227,179,65,.12)', bordercolor:C.amber,
+                    borderwidth:1, borderpad:4, align:'left'}],
+    }), CFG);
+
+    // Chow bar
+    const chow = D.chow;
+    const colors = chow.map(d => d.Break === 'Sim' ? C.amber : C.muted);
+    Plotly.newPlot('chow-bar', [
+      {x:chow.map(d=>d['Chow_F']), y:chow.map(d=>d.Feature),
+       type:'bar', orientation:'h',
+       marker:{color:colors},
+       text:chow.map(d=>`F=${d['Chow_F'].toFixed(2)}`),
+       textposition:'outside'}
+    ], layout({
+      height:260,
+      xaxis:{...LAYOUT_BASE.xaxis, title:'Chow F-statistic'},
+      yaxis:{...LAYOUT_BASE.yaxis},
+      shapes:[{type:'line',x0:3.84,x1:3.84,y0:0,y1:1,yref:'paper',
+               line:{color:C.red,dash:'dot',width:1.5}}],
+      annotations:[{x:3.84,y:1,yref:'paper',text:'α=0,05',showarrow:false,
+                    font:{color:C.red,size:9},xanchor:'left'}],
+    }), CFG);
+
+    // Framework flow
+    Plotly.newPlot('framework-flow', [{
+      type:'scatter', mode:'markers+text',
+      x:[1,2,3,4,5],
+      y:[1,1,1,1,1],
+      text:['1️⃣ Feature<br>Engineering','2️⃣ Chow<br>Test','3️⃣ ML + XAI<br>Triangulation','4️⃣ AHP<br>Gaussiano','5️⃣ Event<br>Study'],
+      textposition:'middle center',
+      marker:{size:80, color:[C.teal,C.amber,C.blue,C.green,C.red],
+              opacity:0.15, line:{color:'transparent'}},
+      hovertext:['Text mining + Bloomberg → 12 features ESGE',
+                 'Teste de Chow → quebra estrutural 2018',
+                 'XGBoost → SHAP · LIME · DiCE',
+                 'Monte Carlo N=10.000 → pesos probabilísticos',
+                 'Market model → Mount Polley 2014'],
+      hoverinfo:'text',
+    }], layout({
+      height:120,
+      xaxis:{...LAYOUT_BASE.xaxis, visible:false, range:[0.4,5.6]},
+      yaxis:{...LAYOUT_BASE.yaxis, visible:false, range:[0.5,1.5]},
+      margin:{t:10,b:10,l:10,r:10},
+    }), CFG);
+  },
+
+  xai() {
+    // SHAP bar
+    const si = [...D.shap_imp].sort((a,b)=>a.importance-b.importance);
+    Plotly.newPlot('shap-bar', [{
+      x:si.map(d=>d.importance), y:si.map(d=>d.feature),
+      type:'bar', orientation:'h',
+      marker:{color:[C.muted,C.teal,C.amber,C.blue]},
+      text:si.map(d=>`${(d.importance/1000).toFixed(0)}k`),
+      textposition:'outside',
+    }], layout({
+      height:260,
+      xaxis:{...LAYOUT_BASE.xaxis, title:'Mean |SHAP value|'},
+    }), CFG);
+
+    // XGBoost feature importance
+    const fi = [...D.feat_imp].sort((a,b)=>a.Mean-b.Mean);
+    Plotly.newPlot('feat-bar', [{
+      x:fi.map(d=>d.Mean*100), y:fi.map(d=>d.Feature),
+      type:'bar', orientation:'h',
+      error_x:{type:'data', array:fi.map(d=>d.Std*100), visible:true,
+               color:'rgba(255,255,255,.4)', thickness:2},
+      marker:{color:[C.muted,C.muted,C.teal,C.blue]},
+      text:fi.map(d=>`${(d.Mean*100).toFixed(1)}%`),
+      textposition:'outside',
+    }], layout({
+      height:260,
+      xaxis:{...LAYOUT_BASE.xaxis, title:'Feature Importance % (Gain)'},
+    }), CFG);
+
+    // SHAP vs LIME
+    const sl = D.shap_lime;
+    Plotly.newPlot('shap-lime-chart', [
+      {name:'SHAP', x:sl.map(d=>d.Feature), y:sl.map(d=>d.SHAP),
+       type:'bar', marker:{color:C.blue},
+       text:sl.map(d=>d.SHAP.toFixed(3)), textposition:'outside'},
+      {name:'LIME', x:sl.map(d=>d.Feature), y:sl.map(d=>d.LIME),
+       type:'bar', marker:{color:C.teal},
+       text:sl.map(d=>d.LIME.toFixed(3)), textposition:'outside'},
+    ], layout({
+      height:260, barmode:'group',
+      yaxis:{...LAYOUT_BASE.yaxis, title:'Importância Normalizada'},
+      legend:{...LAYOUT_BASE.legend, orientation:'h', y:-0.22},
+    }), CFG);
+
+    // DiCE
+    Plotly.newPlot('dice-chart', [{
+      x:D.dice.map(d=>d.Strategy), y:D.dice.map(d=>d.Score),
+      type:'bar',
+      marker:{color:[C.green, C.teal, C.amber],
+              line:{color:'rgba(255,255,255,.1)', width:1}},
+      text:D.dice.map(d=>`${(d.Score/1000).toFixed(0)}k<br>${d.Feasibility}`),
+      textposition:'outside',
+    }], layout({
+      height:260,
+      yaxis:{...LAYOUT_BASE.yaxis, title:'Predicted Score', range:[0, 450000]},
+    }), CFG);
+  },
+
+  ahp() {
+    // Donut
+    const aw = D.ahp_weights;
+    const pcolors = [C.green, C.blue, C.purple, C.orange];
+    Plotly.newPlot('ahp-donut', [{
+      values:aw.map(d=>d.Mean*100),
+      labels:aw.map(d=>d.Criterion),
+      type:'pie', hole:0.55,
+      marker:{colors:pcolors, line:{color:C.panel, width:2}},
+      textinfo:'label+percent', textfont:{size:11},
+      pull:[0.06,0,0,0],
+    }], layout({
+      height:300, margin:{t:10,b:10,l:10,r:10},
+      annotations:[{text:'ESGE<br>Weights', x:0.5,y:0.5,
+                    showarrow:false, font:{size:13,color:C.green}}],
+    }), CFG);
+
+    // IC 95%
+    Plotly.newPlot('ahp-ic', [{
+      x:aw.map(d=>d.Criterion),
+      y:aw.map(d=>d.Mean*100),
+      error_y:{type:'data', symmetric:false,
+               array:aw.map(d=>(d.CI_95_Upper-d.Mean)*100),
+               arrayminus:aw.map(d=>(d.Mean-d.CI_95_Lower)*100),
+               thickness:3, width:10, color:'rgba(255,255,255,.5)'},
+      type:'scatter', mode:'markers',
+      marker:{size:16, color:pcolors, symbol:'diamond',
+              line:{color:'white',width:1}},
+    }], layout({
+      height:300,
+      yaxis:{...LAYOUT_BASE.yaxis, title:'Peso Médio (%)', range:[0,70]},
+    }), CFG);
+
+    // P(CR<0.10) sensitivity
+    const as = D.ahp_sens;
+    Plotly.newPlot('ahp-cr', [{
+      x:as.map(d=>d.Sigma), y:as.map(d=>d['P(CR<0.10)_%']),
+      mode:'lines+markers+text',
+      text:as.map(d=>`${d['P(CR<0.10)_%'].toFixed(1)}%`),
+      textposition:'top center',
+      line:{color:C.green, width:3},
+      marker:{size:10, color:C.green},
+    }], layout({
+      height:260,
+      xaxis:{...LAYOUT_BASE.xaxis, title:'σ (incerteza de julgamento)'},
+      yaxis:{...LAYOUT_BASE.yaxis, title:'P(CR<0,10) %', range:[75,105]},
+      shapes:[{type:'line',x0:0.05,x1:0.2,y0:90,y1:90,
+               line:{color:C.amber,dash:'dot',width:1.5}}],
+    }), CFG);
+
+    // Weights by sigma
+    const dims = [
+      {key:'E_Mean', label:'Environmental', color:C.green},
+      {key:'S_Mean', label:'Social',        color:C.blue},
+      {key:'G_Mean', label:'Governance',    color:C.purple},
+      {key:'Ec_Mean',label:'Economic',      color:C.orange},
+    ];
+    Plotly.newPlot('ahp-sens', dims.map(dim=>({
+      x:as.map(d=>d.Sigma), y:as.map(d=>d[dim.key]*100),
+      mode:'lines+markers', name:dim.label,
+      line:{color:dim.color, width:2}, marker:{size:7},
+    })), layout({
+      height:260,
+      xaxis:{...LAYOUT_BASE.xaxis, title:'σ'},
+      yaxis:{...LAYOUT_BASE.yaxis, title:'Peso médio (%)'},
+      legend:{...LAYOUT_BASE.legend, orientation:'h', y:-0.25},
+    }), CFG);
+
+    // Table
+    const tbl = document.getElementById('ahp-table');
+    tbl.innerHTML = `<tr>
+      <th>Dimensão</th><th>Peso Médio</th><th>IC 95% Inf</th>
+      <th>IC 95% Sup</th><th>CV%</th></tr>`
+      + aw.map(r=>`<tr>
+        <td>${r.Criterion}</td>
+        <td><strong>${(r.Mean*100).toFixed(2)}%</strong></td>
+        <td>${(r.CI_95_Lower*100).toFixed(2)}%</td>
+        <td>${(r.CI_95_Upper*100).toFixed(2)}%</td>
+        <td>${r['CV_%'].toFixed(2)}%</td>
+      </tr>`).join('');
+  },
+
+  event() {
+    const ev = D.event;
+    const years = [2012,2013,2014,2015,2016,2017];
+    const vals  = [ev.Expected*0.5, ev.Expected*0.3, ev.Actual, ev.CAR*0.25, ev.CAR*0.55, ev.CAR*0.82];
+    const bcolors = years.map(y => y===2014 ? C.red : y>2014 ? C.green : C.muted);
+
+    Plotly.newPlot('event-bar', [{
+      x:years, y:vals, type:'bar',
+      marker:{color:bcolors, line:{color:'rgba(255,255,255,.1)',width:1}},
+      text:vals.map(v=>`${v.toFixed(1)}%`), textposition:'outside',
+    }], layout({
+      height:300,
+      xaxis:{...LAYOUT_BASE.xaxis, title:'Ano'},
+      yaxis:{...LAYOUT_BASE.yaxis, title:'Retorno (%)'},
+      shapes:[{type:'line',x0:2013.5,x1:2014.5,y0:0,y1:0,
+               line:{color:'rgba(255,255,255,.3)',width:1}}],
+      annotations:[{x:2014, y:ev.Actual-8, text:'Mount Polley<br>AR=−60,03%*',
+                    showarrow:true, arrowcolor:C.red, font:{color:C.red,size:10},
+                    bgcolor:'rgba(248,81,73,.1)', bordercolor:C.red, borderwidth:1, borderpad:4}],
+    }), CFG);
+
+    // Decomp waterfall
+    Plotly.newPlot('event-decomp', [{
+      type:'waterfall',
+      x:['Retorno<br>Esperado', 'Retorno<br>Anormal', 'Retorno<br>Observado'],
+      y:[ev.Expected, ev.AR, 0],
+      measure:['absolute','relative','total'],
+      connector:{line:{color:C.border}},
+      increasing:{marker:{color:C.green}},
+      decreasing:{marker:{color:C.red}},
+      totals:{marker:{color:C.amber}},
+      text:[`${ev.Expected.toFixed(2)}%`, `${ev.AR.toFixed(2)}%`, `${ev.Actual.toFixed(2)}%`],
+      textposition:'outside',
+    }], layout({
+      height:300,
+      yaxis:{...LAYOUT_BASE.yaxis, title:'Retorno (%)'},
+    }), CFG);
+  },
+
+  bench() {
+    const b = D.bench;
+    const metrics = b.map(d=>d.Metric);
+    const teckV   = b.map(d=>d.Teck);
+    const tsxV    = b.map(d=>d.TSX);
+
+    Plotly.newPlot('bench-bar', [
+      {name:'Teck Resources', x:metrics, y:teckV, type:'bar',
+       marker:{color:C.blue}, text:teckV.map(v=>v.toFixed(2)), textposition:'outside'},
+      {name:'TSX Mining Index', x:metrics, y:tsxV, type:'bar',
+       marker:{color:C.muted}, text:tsxV.map(v=>v.toFixed(2)), textposition:'outside'},
+    ], layout({
+      height:320, barmode:'group',
+      legend:{...LAYOUT_BASE.legend, orientation:'h', y:-0.2},
+    }), CFG);
+
+    // Scatter risk-return
+    const tRet = b.find(d=>d.Metric.includes('Return')).Teck;
+    const tsxRet= b.find(d=>d.Metric.includes('Return')).TSX;
+    const tVol = b.find(d=>d.Metric.includes('Volatility')).Teck;
+    const tsxVol= b.find(d=>d.Metric.includes('Volatility')).TSX;
+    const tSh  = b.find(d=>d.Metric.includes('Sharpe')).Teck;
+    const tsxSh= b.find(d=>d.Metric.includes('Sharpe')).TSX;
+
+    Plotly.newPlot('bench-scatter', [
+      {x:[tVol], y:[tRet], mode:'markers+text', name:'Teck Resources',
+       text:['Teck'], textposition:'top center',
+       marker:{size:tSh*120, color:C.blue, opacity:.8,
+               line:{color:'white',width:2}}},
+      {x:[tsxVol], y:[tsxRet], mode:'markers+text', name:'TSX Mining Index',
+       text:['TSX Mining'], textposition:'top center',
+       marker:{size:tsxSh*120, color:C.muted, opacity:.8,
+               line:{color:'white',width:2}}},
+    ], layout({
+      height:320,
+      xaxis:{...LAYOUT_BASE.xaxis, title:'Volatilidade (%)'},
+      yaxis:{...LAYOUT_BASE.yaxis, title:'Retorno Médio (%)'},
+      annotations:[{x:0.5,y:-0.15,xref:'paper',yref:'paper',
+                    text:'Tamanho do ponto proporcional ao Sharpe Ratio',
+                    showarrow:false, font:{color:C.muted, size:11}}],
+    }), CFG);
+  }
+};
+
+// Render overview on load
+window.addEventListener('DOMContentLoaded', () => renderPage('overview'));
+</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# .GITIGNORE - XAI-AHP-GAUSSIAN ESGE FRAMEWORK
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+profile_default/
+ipython_config.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data Files (IMPORTANTE: Não versionar dados sensíveis)
+data/raw/*.pdf
+data/raw/*.csv
+data/processed/*.csv
+data/processed/*.parquet
+*.xlsx
+*.xls
+
+# Outputs (Não versionar resultados)
+outputs/figures/*.png
+outputs/figures/*.jpg
+outputs/tables/*.csv
+outputs/models/*.pkl
+outputs/models/*.joblib
+outputs/logs/*.log
+outputs/logs/*.txt
+
+# Power BI
+powerbi_data/*.csv
+*.pbix
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Documentation
+docs/_build/
+site/
+
+# OS
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Large Files
+*.h5
+*.hdf5
+
+# Project-specific exclusions
+UPLOAD_GITHUB/
+anaconda_projects/
+cache/
+logs/
+powerbi_package/
+Untitled.ipynb
+*.docx
+*.pdf
+streamlit_dashboard/
+outputs/extraction_process.log
+outputs/extraction_audit.log
+outputs/lime_explanation_*.html
+
+# ═══════════════════════════════════════════════════════════════════════════
+# IMPORTANT: Files TO KEEP in version control
+# ═══════════════════════════════════════════════════════════════════════════
+# ✅ README.md
+# ✅ requirements.txt
+# ✅ LICENSE
+# ✅ .gitignore
+# ✅ All .py files in src/
+# ✅ All .ipynb files in notebooks/ (with outputs cleared)
+# ✅ docs/ folder
+# ✅ tests/ folder
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Keep empty directories
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!outputs/figures/.gitkeep
+!outputs/tables/.gitkeep
+!outputs/models/.gitkeep
+!outputs/logs/.gitkeep
+!powerbi_data/.gitkeep

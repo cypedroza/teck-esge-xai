@@ -1,0 +1,72 @@
+
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUÇÕES PARA IMPORTAÇÃO NO POWER BI
+═══════════════════════════════════════════════════════════════════════════════
+
+1. IMPORTAR TABELAS:
+   - Arquivo → Obter Dados → Texto/CSV
+   - Selecionar: FATO_Scores.csv, DIM_*.csv
+   - Encoding: UTF-8
+   - Delimitador: Vírgula
+
+2. CRIAR RELACIONAMENTOS (Modelo de Dados):
+
+   a) FATO_Scores[Ano] → DIM_Calendario[Ano]
+      Cardinalidade: Many-to-One (N:1)
+      Direção: Ambas
+
+   b) FATO_Scores (via DAX) → DIM_Pesos_AHP
+      Uso: Medidas calculadas (ver seção 3)
+
+   c) FATO_Scores (via DAX) → DIM_Importancia_XAI
+      Uso: Tooltips e análise de drivers
+
+3. MEDIDAS DAX SUGERIDAS:
+
+   Score_ESGE_Ponderado = 
+      SUMX(
+          DIM_Pesos_AHP,
+          DIM_Pesos_AHP[Peso_Medio] * 
+          RELATED(FATO_Scores[Score_ESG])  // Ajustar para cada dimensão
+      )
+
+   Retorno_Medio_Periodo = 
+      AVERAGE(FATO_Scores[Retorno_Anual_Pct])
+
+   Score_vs_Benchmark = 
+      [Score_ESGE_Ponderado] - [Score_Medio_Historico]
+
+4. VISUALIZAÇÕES RECOMENDADAS:
+
+   Dashboard 1: Executivo
+   - KPI Cards: Score ESG, Retorno Anual, Volume
+   - Line Chart: Evolução temporal (FATO_Scores[Ano] vs Score_ESG)
+   - Waterfall: Decomposição AHP (DIM_Pesos_AHP)
+
+   Dashboard 2: Análise XAI
+   - Bar Chart: Importância SHAP (DIM_Importancia_XAI)
+   - Scatter Plot: Retorno vs ESG Score
+   - Matrix: Pilar ESGE vs Importância
+
+   Dashboard 3: Temporal
+   - Slicer: DIM_Calendario[Decada]
+   - Timeline: FATO_Scores[Data_Atualizacao]
+
+5. FORMATAÇÃO:
+
+   - Retorno_Anual_Pct: Formato percentual, 2 casas decimais
+   - Volume_Negociacao: Formato número, separador de milhares
+   - Peso_Medio: Formato decimal, 4 casas
+   - Preco_Fechamento: Formato moeda (CAD)
+
+6. FILTROS RECOMENDADOS:
+
+   - DIM_Calendario[Status]: "Histórico" / "Atual"
+   - DIM_Pesos_AHP[Dimensao_ESGE]: Filtrar por pilar
+   - FATO_Scores[Ano]: Slicer de anos
+
+═══════════════════════════════════════════════════════════════════════════════
+SUPORTE:
+  Dúvidas: cesar.pedroza@usp.br
+  Repositório: github.com/cesarpedroza/teck-esge-xai
+═══════════════════════════════════════════════════════════════════════════════
