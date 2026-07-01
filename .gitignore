@@ -51,6 +51,7 @@ data/raw/*.pdf
 data/raw/*.csv
 data/processed/*.csv
 data/processed/*.parquet
+data/processed/*.pkl
 *.xlsx
 *.xls
 
@@ -62,6 +63,15 @@ outputs/models/*.pkl
 outputs/models/*.joblib
 outputs/logs/*.log
 outputs/logs/*.txt
+outputs/*.csv
+outputs/*.txt
+outputs/*.html
+outputs/*.log
+outputs/**/*.txt
+outputs/**/*.csv
+
+# Working/draft scripts (não fazem parte do pipeline publicável)
+fill_tcc_*.py
 
 # Power BI
 powerbi_data/*.csv
