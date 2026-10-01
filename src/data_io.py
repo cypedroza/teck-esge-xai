@@ -19,14 +19,17 @@ FEATURE_MAPPING = {
     "volume": "Market_Liquidity",
 }
 
+# Explanatory module (reformulated, Oct 2026): what is associated with the
+# level of ESG disclosure? The target is the article's central variable and is
+# NOT constructed from the explanatory variables.
 FEATURES: List[str] = [
-    "ESG_Disclosure_Index",
-    "Report_Quality_Score",
-    "Annual_Return_Pct",
-    "Market_Liquidity",
+    "Report_Quality_Score",   # report length (characters)
+    "Market_Liquidity",       # mean daily trading volume
+    "Annual_Return_Pct",      # calendar-year return (%)
+    "close_price",            # year-end adjusted close (CAD)
 ]
 
-TARGET = "ESGE_score"
+TARGET = "log_ESG_Disclosure"   # log(1 + ESG_Disclosure_Index)
 
 
 def normalize_feature_names(df: pd.DataFrame) -> pd.DataFrame:
@@ -60,13 +63,17 @@ def returns_by_year(df: pd.DataFrame, column: str = "Annual_Return_Pct") -> pd.S
 
 
 def modelling_frame(df: pd.DataFrame) -> pd.DataFrame:
-    """Rows with complete features and target, still carrying the year."""
-    missing = [c for c in FEATURES + [TARGET] if c not in df.columns]
+    """Rows with complete features and target, still carrying the year.
+
+    The target is derived here, transparently, from ESG_Disclosure_Index.
+    """
+    df = df.copy()
+    if "ESG_Disclosure_Index" not in df.columns:
+        raise KeyError("ESG_Disclosure_Index is required to build the target.")
+    df[TARGET] = np.log1p(df["ESG_Disclosure_Index"])
+    missing = [c for c in FEATURES if c not in df.columns]
     if missing:
-        raise KeyError(
-            f"Columns missing for modelling: {missing}. The modelling scripts need the "
-            f"dataset that contains '{TARGET}' (data/processed/esge_master_final.csv)."
-        )
+        raise KeyError(f"Columns missing for modelling: {missing}")
     return df[["year"] + FEATURES + [TARGET]].dropna().reset_index(drop=True)
 
 

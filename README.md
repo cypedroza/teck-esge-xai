@@ -54,9 +54,7 @@ pip install -r requirements-dev.txt
 #    reports in data/raw/ and run notebooks/02_data_extraction.ipynb
 # 2) analysis (runs 01 → 04 → 05 and stops at the first error)
 python run_pipeline.py
-#    05 downloads and caches ^GSPTSE and TECK-B.TO prices on first run
-#    02 → 03 (ML/XAI) are suspended until a validated target is defined:
-#    python run_pipeline.py --with-ml
+#    01 → 02 → 03 → 04 → 05; script 05 downloads and caches ^GSPTSE and TECK-B.TO prices
 # 3) dashboard
 streamlit run app/streamlit_app.py
 
@@ -73,8 +71,7 @@ figures to `outputs/figures/`.
 | Module | Implementation |
 |---|---|
 | Structural break | Chow test at 2018 on a linear trend `y = β₀ + β₁·year`, pre (2001–2017) vs post (2018–2024). |
-| Prediction | Mean and linear baselines, Random Forest and XGBoost; hyper-parameters by `GridSearchCV` with `TimeSeriesSplit(5)`; scaling inside a `Pipeline`. Out-of-sample metrics (CV) are reported separately from in-sample fit; 95% intervals from an out-of-bag bootstrap. |
-| Target check | OLS R² of `ESGE_score` on the four features. A value near 1 means the target is close to a linear combination of the inputs, so model R² is not evidence of predictive ability. |
+| Explanatory model | Target: log(1 + ESG Disclosure Index), the article's central variable, not built from the features (checked by an OLS circularity test). Features: report length, market liquidity, annual return, year-end price. Mean and linear baselines, Random Forest and XGBoost tuned by leave-one-out. Leave-one-out R² is the headline out-of-sample metric; TimeSeriesSplit R² is also reported and is strongly negative because of the 2018 break, so the module is explanatory rather than predictive; out-of-bag bootstrap intervals. |
 | XAI | SHAP `TreeExplainer` (global mean \|φ\|); LIME on 10 k-medoids years with 1,000 perturbations each; Pearson and Spearman agreement between normalised importances (4 features, df = 2: descriptive only); DiCE counterfactuals (random sampling — gradient-based DiCE does not apply to tree ensembles) with sparsity and proximity. |
 | Gaussian AHP | 4×4 Saaty matrix (E > S > G > Ec) set a priori by the author; each upper-triangular judgment multiplied by N(1, σ²); diagonal fixed at 1, lower triangle reciprocal; 10,000 simulations per σ. |
 | Finance | Annual returns from year-end adjusted closes (Yahoo Finance) for TECK-B.TO and ^GSPTSE; Sharpe, Sortino, VaR/CVaR 95%, max drawdown, beta, Treynor (risk-free rate in `config.py`); paired and Welch t-tests. |

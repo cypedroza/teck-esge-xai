@@ -23,6 +23,7 @@ These are proxies with partial coverage of each dimension; see the article's lim
 The target used in earlier runs (`esge_master_final.csv`) had `E_score`,
 `S_score` and `G_score` equal to zero in every year, so `ESGE_score` was
 exactly 0.25 × `Ec_score`, a price/return-derived variable. That file also
-lacked the trading-volume column the models use. The ML/XAI modules (02, 03)
-are therefore suspended until a new target is defined, documented here and
-built by a script in this repository.
+lacked the trading-volume column the models use. In the October 2026 revision
+the ML/XAI modules (02, 03) were reformulated: the target is now
+log(1 + ESG_Disclosure_Index), built in `src/data_io.modelling_frame` from
+`esge_master.csv`, and explained by report length, liquidity, return and price.

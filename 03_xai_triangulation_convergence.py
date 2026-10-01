@@ -2,7 +2,7 @@
 SCRIPT 3 — XAI triangulation: SHAP, LIME and DiCE
 ==================================================
 
-Inputs: ``data/processed/esge_master_final.csv`` and the fitted pipeline
+Inputs: ``data/processed/esge_master.csv`` and the fitted pipeline
 ``outputs/models/xgb_pipeline.pkl`` produced by script 02 (scaler + model, so
 the explanations use exactly the preprocessing the model was trained with).
 
@@ -15,7 +15,8 @@ the explanations use exactly the preprocessing the model was trained with).
   descriptive indicator only; the p-values are reported to make that explicit.
 * DiCE — genuine counterfactuals from ``dice_ml`` (model-agnostic random
   sampling; gradient-based DiCE does not apply to tree ensembles) for the most
-  recent year, asking for a 10–30 % higher predicted score. Sparsity (number
+  recent year, asking for a 10–30 % higher predicted ESG Disclosure Index
+  (converted to the model's log scale). Sparsity (number
   of features changed) and proximity (mean absolute change in SD units) are
   reported for each counterfactual.
 
@@ -70,7 +71,7 @@ def k_medoids(Z: np.ndarray, k: int, rng: np.random.Generator, n_iter: int = 100
 
 
 def main() -> None:
-    df = modelling_frame(load_master(config.DATA_PROCESSED / config.MODELLING_FILE))
+    df = modelling_frame(load_master(config.DATA_PROCESSED / config.MASTER_FILE))
     X = df[FEATURES].to_numpy(float)
     pipeline = joblib.load(MODELS / "xgb_pipeline.pkl")
     scaler, model = pipeline.named_steps["scaler"], pipeline.named_steps["model"]
@@ -147,8 +148,8 @@ def main() -> None:
         dice = dice_ml.Dice(data, dmodel, method="random")
         last = df["year"].idxmax()
         query = df.loc[[last], FEATURES]
-        pred = float(pipeline.predict(query)[0])
-        lo, hi = sorted([pred * 1.10, pred * 1.30])
+        pred = float(pipeline.predict(query)[0])          # log(1 + index)
+        lo, hi = np.log1p(np.expm1(pred) * 1.10), np.log1p(np.expm1(pred) * 1.30)
         cf = dice.generate_counterfactuals(query, total_CFs=5, desired_range=[lo, hi],
                                            random_seed=SEED)
         cfs = cf.cf_examples_list[0].final_cfs_df
@@ -163,10 +164,12 @@ def main() -> None:
                 **{f"{f}_change_%": (cfs[f] / query.iloc[0][f] - 1) * 100 for f in FEATURES},
             )
             cfs.insert(0, "query_year", int(df.loc[last, "year"]))
-            cfs.insert(1, "query_prediction", pred)
+            cfs.insert(1, "query_predicted_index", float(np.expm1(pred)))
+            cfs["predicted_disclosure_index"] = np.expm1(pipeline.predict(cfs[FEATURES]))
+            cfs = cfs.drop(columns=[TARGET])  # DiCE rounds this column; use the model prediction
             cfs.to_csv(TABLES / "dice_counterfactuals.csv", index=False)
             print(f"\nDiCE: {len(cfs)} counterfactuals for {int(df.loc[last, 'year'])} "
-                  f"(prediction {pred:,.2f} → [{lo:,.2f}, {hi:,.2f}])")
+                  f"(predicted index {np.expm1(pred):,.1f} → [{np.expm1(lo):,.1f}, {np.expm1(hi):,.1f}])")
             print(cfs.round(3).to_string(index=False))
     except Exception as exc:  # report, never fabricate
         print(f"\nDiCE could not be run: {exc}")
