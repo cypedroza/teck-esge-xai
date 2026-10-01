@@ -50,6 +50,10 @@ ipython_config.py
 data/raw/*.pdf
 data/raw/*.csv
 data/processed/*.csv
+# The two analysis datasets are small, derived from public sources and needed
+# for anyone to reproduce the results, so they are versioned:
+!data/processed/esge_master.csv
+!data/processed/esge_master_final.csv
 data/processed/*.parquet
 data/processed/*.pkl
 *.xlsx
@@ -121,6 +125,7 @@ Thumbs.db
 
 # Project-specific exclusions
 UPLOAD_GITHUB/
+RELATORIO_EXECUTIVO.docx
 anaconda_projects/
 cache/
 logs/

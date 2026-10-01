@@ -21,8 +21,13 @@ Data: 2026-04-21
 import sys
 from pathlib import Path
 import warnings
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
@@ -33,15 +38,12 @@ import statsmodels.api as sm
 
 warnings.filterwarnings('ignore')
 
-# Paths
-BASE_DIR = Path(r"C:\Users\user\Documents\_MBA_Data_Science_Analytics\00 - Temas TCC\teck-esge-xai")
-DATA_PROCESSED = BASE_DIR / "data" / "processed"
-OUTPUTS_TABLES = BASE_DIR / "outputs" / "tables"
-OUTPUTS_FIGURES = BASE_DIR / "outputs" / "figures"
+from config import config
 
-# Criar diretórios se não existirem
-OUTPUTS_TABLES.mkdir(parents=True, exist_ok=True)
-OUTPUTS_FIGURES.mkdir(parents=True, exist_ok=True)
+# Paths (relative to the repository; override with env var ESGE_BASE_DIR)
+DATA_PROCESSED = config.DATA_PROCESSED
+OUTPUTS_TABLES = config.OUTPUTS_TABLES
+OUTPUTS_FIGURES = config.OUTPUTS_FIGURES
 
 # ════════════════════════════════════════════════════════════════════════════
 # MAPEAMENTO E NORMALIZAÇÃO DE FEATURES
@@ -537,7 +539,12 @@ class ComprehensiveStatisticalAnalysis:
 
 if __name__ == "__main__":
     # Carregar dados
-    data_path = DATA_PROCESSED / "esge_master.csv"
+    # Prefer the final dataset (same features plus ESGE_score); fall back to the
+    # extraction output. The file actually used is printed for traceability.
+    data_path = DATA_PROCESSED / config.MODELLING_FILE
+    if not data_path.exists():
+        data_path = DATA_PROCESSED / config.MASTER_FILE
+    print(f"Dataset: {data_path.name}")
     
     if not data_path.exists():
         print(f"❌ ERRO: Arquivo não encontrado: {data_path}")

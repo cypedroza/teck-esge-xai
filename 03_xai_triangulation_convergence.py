@@ -1,531 +1,178 @@
 """
-════════════════════════════════════════════════════════════════════════════
-SCRIPT 3: XAI TRIANGULAÇÃO E CONVERGÊNCIA
-════════════════════════════════════════════════════════════════════════════
+SCRIPT 3 — XAI triangulation: SHAP, LIME and DiCE
+==================================================
 
-Análise de Explicabilidade (XAI) com validação cruzada metodológica:
-- SHAP (global): TreeExplainer para importância agregada
-- LIME (local): Explicações instance-level
-- DiCE (contrafactuais): Ações estratégicas acionáveis
-- Convergência LIME-SHAP: Correlação de Pearson entre importâncias
-- Stability metrics: Robustez das explicações
-- Fidelity scores: Quão fiéis as explicações são ao modelo original
-- Counterfactual diversity: Métricas DPP (Determinantal Point Processes)
+Inputs: ``data/processed/esge_master_final.csv`` and the fitted pipeline
+``outputs/models/xgb_pipeline.pkl`` produced by script 02 (scaler + model, so
+the explanations use exactly the preprocessing the model was trained with).
 
-Referências:
-- Molnar et al. (2024): Beyond SHAP - Causal XAI
-- Ribeiro & Lundberg (2024): LIME-SHAP Convergence
-- Guidotti (2023): Fidelity-Diversity Trade-off
+* SHAP — TreeExplainer on the fitted XGBoost model, global importance = mean |φ|.
+* LIME — LimeTabularExplainer on the standardised features, 1,000 perturbations
+  per instance, explaining N = 10 representative years chosen by k-medoids
+  (PAM-style alternation on standardised features, seeded).
+* Convergence — Pearson and Spearman correlation between the normalised SHAP
+  and LIME importance vectors. With four features (df = 2) this is a
+  descriptive indicator only; the p-values are reported to make that explicit.
+* DiCE — genuine counterfactuals from ``dice_ml`` (model-agnostic random
+  sampling; gradient-based DiCE does not apply to tree ensembles) for the most
+  recent year, asking for a 10–30 % higher predicted score. Sparsity (number
+  of features changed) and proximity (mean absolute change in SD units) are
+  reported for each counterfactual.
 
-Autor: Cesar Yoshio Machado Pedroza
-Data: 2026-04-21
-════════════════════════════════════════════════════════════════════════════
+Author: Cesar Yoshio Machado Pedroza
 """
 
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
 import warnings
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.preprocessing import StandardScaler
-import shap
-from lime import lime_tabular
 import joblib
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import shap
+from lime.lime_tabular import LimeTabularExplainer
+from scipy import stats
 
-warnings.filterwarnings('ignore')
+from config import config
+from data_io import FEATURES, TARGET, load_master, modelling_frame
 
-# Paths
-BASE_DIR = Path(r"C:\Users\user\Documents\_MBA_Data_Science_Analytics\00 - Temas TCC\teck-esge-xai")
-DATA_PROCESSED = BASE_DIR / "data" / "processed"
-OUTPUTS_TABLES = BASE_DIR / "outputs" / "tables"
-OUTPUTS_FIGURES = BASE_DIR / "outputs" / "figures"
-OUTPUTS_MODELS = BASE_DIR / "outputs" / "models"
+warnings.filterwarnings("ignore")
 
-# Feature mapping
-FEATURE_MAPPING = {
-    'esg_disclosure_score': 'ESG_Disclosure_Index',
-    'char_count': 'Report_Quality_Score',
-    'annual_return_%': 'Annual_Return_Pct',
-    'volume': 'Market_Liquidity'
-}
-
-def normalize_feature_names(df):
-    return df.rename(columns=FEATURE_MAPPING)
+SEED = config.RANDOM_STATE
+TABLES, FIGURES, MODELS = config.OUTPUTS_TABLES, config.OUTPUTS_FIGURES, config.OUTPUTS_MODELS
+N_LIME_INSTANCES = 10
+LIME_SAMPLES = 1000
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# CLASSE PRINCIPAL
-# ════════════════════════════════════════════════════════════════════════════
+def k_medoids(Z: np.ndarray, k: int, rng: np.random.Generator, n_iter: int = 100) -> np.ndarray:
+    """Indices of k medoids (simple alternating k-medoids, Euclidean)."""
+    n = len(Z)
+    if k >= n:
+        return np.arange(n)
+    D = np.linalg.norm(Z[:, None, :] - Z[None, :, :], axis=2)
+    medoids = rng.choice(n, size=k, replace=False)
+    for _ in range(n_iter):
+        labels = np.argmin(D[:, medoids], axis=1)
+        new = medoids.copy()
+        for c in range(k):
+            members = np.where(labels == c)[0]
+            if len(members):
+                new[c] = members[np.argmin(D[np.ix_(members, members)].sum(axis=1))]
+        if set(new) == set(medoids):
+            break
+        medoids = new
+    return np.sort(medoids)
 
-class XAITriangulation:
-    """Análise XAI com triangulação SHAP-LIME-DiCE."""
-    
-    def __init__(self, data_path: Path, model_path: Path):
-        """Inicializa com dados e modelo treinado."""
-        print("═" * 80)
-        print("XAI TRIANGULAÇÃO E CONVERGÊNCIA")
-        print("═" * 80)
-        
-        # Carregar dados
-        df_raw = pd.read_csv(data_path)
-        self.df = normalize_feature_names(df_raw)
-        
-        # Features
-        self.feature_names = ['ESG_Disclosure_Index', 'Report_Quality_Score',
-                             'Annual_Return_Pct', 'Market_Liquidity']
-        # Target: ESGE_score calculado externamente (independente das features)
-        required = self.feature_names + ['ESGE_score']
-        missing = [c for c in required if c not in self.df.columns]
-        if missing:
-            raise ValueError(f"Colunas ausentes no dataset: {missing}. Use esge_master_final.csv")
 
-        df_clean = self.df[required].dropna()
-        self.X = df_clean[self.feature_names].values
-        self.y = df_clean['ESGE_score'].values
+def main() -> None:
+    df = modelling_frame(load_master(config.DATA_PROCESSED / config.MODELLING_FILE))
+    X = df[FEATURES].to_numpy(float)
+    pipeline = joblib.load(MODELS / "xgb_pipeline.pkl")
+    scaler, model = pipeline.named_steps["scaler"], pipeline.named_steps["model"]
+    Z = scaler.transform(X)
+    rng = np.random.default_rng(SEED)
 
-        # Scaler
-        self.scaler = StandardScaler()
-        self.X_scaled = self.scaler.fit_transform(self.X)
-        
-        # Carregar modelo
-        self.model = joblib.load(model_path)
-        print(f"\n✅ Modelo carregado: {model_path.name}")
-        print(f"   Features: {self.feature_names}")
-        print(f"   Amostras: {len(self.X_scaled)}")
-        
-        # Resultados
-        self.results = {}
-    
-    def shap_global_importance(self):
-        """Análise SHAP global (TreeExplainer)."""
-        print("\n" + "─" * 80)
-        print("1. SHAP GLOBAL IMPORTANCE")
-        print("─" * 80)
-        
-        # TreeExplainer
-        explainer = shap.TreeExplainer(self.model)
-        shap_values = explainer.shap_values(self.X_scaled)
-        
-        # Importância global (média dos valores absolutos)
-        global_importance = np.abs(shap_values).mean(axis=0)
-        
-        # DataFrame
-        shap_df = pd.DataFrame({
-            'feature': self.feature_names,
-            'importance': global_importance
-        }).sort_values('importance', ascending=False)
-        
-        print("\n📊 SHAP Global Importance:")
-        print(shap_df.to_string(index=False))
-        
-        # Salvar
-        shap_df.to_csv(OUTPUTS_TABLES / "shap_importance.csv", index=False)
-        print("\n✅ Salvo: shap_importance.csv")
-        
-        # Summary plot
-        plt.figure(figsize=(10, 6))
-        shap.summary_plot(shap_values, self.X_scaled, feature_names=self.feature_names, 
-                         show=False, plot_size=(10, 6))
-        plt.tight_layout()
-        plt.savefig(OUTPUTS_FIGURES / "shap_summary.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        print("✅ Salvo: shap_summary.png")
-        
-        self.results['shap'] = {
-            'values': shap_values,
-            'importance': shap_df
-        }
-        
-        return shap_df
-    
-    def lime_local_explanations(self, n_samples=10):
-        """Análise LIME local (múltiplas instâncias)."""
-        print("\n" + "─" * 80)
-        print("2. LIME LOCAL EXPLANATIONS")
-        print("─" * 80)
-        
-        # Verificar variância das features
-        print("\n📊 Verificando variância das features...")
-        feature_variance = self.X_scaled.var(axis=0)
-        for i, (feat, var) in enumerate(zip(self.feature_names, feature_variance)):
-            print(f"   {feat}: variância = {var:.6f}")
-        
-        # Se alguma feature tem variância muito baixa, LIME pode falhar
-        min_variance_threshold = 1e-6
-        low_variance_features = [self.feature_names[i] for i, var in enumerate(feature_variance) if var < min_variance_threshold]
-        
-        if low_variance_features:
-            print(f"\n⚠️ AVISO: Features com baixa variância detectadas: {low_variance_features}")
-            print("   LIME pode ser instável. Usando método alternativo (feature importance)...")
-            
-            # Fallback: usar permutation importance do modelo
-            from sklearn.inspection import permutation_importance
-            perm_imp = permutation_importance(
-                self.model, self.X_scaled, self.y,
-                n_repeats=10, random_state=42
-            )
-            
-            lime_mean = pd.DataFrame({
-                'feature': self.feature_names,
-                'importance': np.abs(perm_imp.importances_mean)
-            }).sort_values('importance', ascending=False)
-            
-            print("\n📊 LIME (via Permutation Importance):")
-            print(lime_mean.to_string(index=False))
-            
-            # Salvar
-            lime_mean.to_csv(OUTPUTS_TABLES / "lime_importance.csv", index=False)
-            print("\n✅ Salvo: lime_importance.csv")
-            
-            self.results['lime'] = {
-                'importance': lime_mean,
-                'method': 'permutation_fallback'
-            }
-            
-            return lime_mean
-        
-        # LIME explainer com configuração robusta
-        try:
-            explainer = lime_tabular.LimeTabularExplainer(
-                self.X_scaled,
-                feature_names=self.feature_names,
-                mode='regression',
-                discretize_continuous=False,  # Evitar discretização que causa problemas
-                random_state=42
-            )
-            
-            # Explicar múltiplas instâncias
-            lime_importances = []
-            
-            # Selecionar instâncias distribuídas ao longo da série
-            indices = np.linspace(0, len(self.X_scaled)-1, min(n_samples, len(self.X_scaled)), dtype=int)
-            
-            print(f"\n📊 Gerando explicações LIME para {len(indices)} instâncias...")
-            
-            for idx in indices:
-                try:
-                    exp = explainer.explain_instance(
-                        self.X_scaled[idx],
-                        self.model.predict,
-                        num_features=len(self.feature_names),
-                        num_samples=100  # Reduzir amostras para estabilidade
-                    )
-                    
-                    # Extrair importâncias
-                    feat_importance = {feat: 0.0 for feat in self.feature_names}
-                    for feat_desc, importance in exp.as_list():
-                        # Encontrar feature name (LIME pode adicionar sufixos)
-                        for feat in self.feature_names:
-                            if feat in feat_desc or feat.replace('_', ' ') in feat_desc:
-                                feat_importance[feat] = abs(importance)
-                                break
-                    
-                    lime_importances.append(feat_importance)
-                
-                except Exception as e:
-                    print(f"   ⚠️ Instância {idx} falhou: {str(e)[:50]}... (continuando)")
-                    continue
-            
-            if not lime_importances:
-                raise Exception("Nenhuma explicação LIME gerada com sucesso")
-            
-            # Agregar importâncias
-            lime_df = pd.DataFrame(lime_importances)
-            lime_mean = lime_df.mean().reset_index()
-            lime_mean.columns = ['feature', 'importance']
-            lime_mean = lime_mean.sort_values('importance', ascending=False)
-            
-            print("\n📊 LIME Aggregated Importance:")
-            print(lime_mean.to_string(index=False))
-            
-            # Salvar
-            lime_mean.to_csv(OUTPUTS_TABLES / "lime_importance.csv", index=False)
-            print("\n✅ Salvo: lime_importance.csv")
-            
-            self.results['lime'] = {
-                'importance': lime_mean,
-                'raw_importances': lime_df,
-                'method': 'lime_standard'
-            }
-            
-            return lime_mean
-            
-        except Exception as e:
-            print(f"\n⚠️ LIME falhou: {str(e)[:100]}")
-            print("   Usando fallback: Permutation Importance...")
-            
-            # Fallback robusto
-            from sklearn.inspection import permutation_importance
-            perm_imp = permutation_importance(
-                self.model, self.X_scaled, self.y,
-                n_repeats=30, random_state=42
-            )
-            
-            lime_mean = pd.DataFrame({
-                'feature': self.feature_names,
-                'importance': np.abs(perm_imp.importances_mean)
-            }).sort_values('importance', ascending=False)
-            
-            print("\n📊 LIME (via Permutation Importance - Fallback):")
-            print(lime_mean.to_string(index=False))
-            
-            lime_mean.to_csv(OUTPUTS_TABLES / "lime_importance.csv", index=False)
-            print("\n✅ Salvo: lime_importance.csv")
-            
-            self.results['lime'] = {
-                'importance': lime_mean,
-                'method': 'permutation_fallback'
-            }
-            
-            return lime_mean
-    
-    def shap_lime_convergence(self):
-        """Análise de convergência SHAP-LIME."""
-        print("\n" + "─" * 80)
-        print("3. CONVERGÊNCIA SHAP-LIME")
-        print("─" * 80)
-        
-        if 'shap' not in self.results or 'lime' not in self.results:
-            print("⚠️ Execute shap_global_importance() e lime_local_explanations() primeiro")
-            return None
-        
-        # Ordenar ambos pelo nome da feature para alinhamento
-        shap_imp = self.results['shap']['importance'].set_index('feature').sort_index()
-        lime_imp = self.results['lime']['importance'].set_index('feature').sort_index()
-        
-        # Normalizar importâncias (0-1)
-        shap_norm = shap_imp['importance'] / shap_imp['importance'].sum()
-        lime_norm = lime_imp['importance'] / lime_imp['importance'].sum()
-        
-        # Correlação de Pearson
-        correlation = np.corrcoef(shap_norm.values, lime_norm.values)[0, 1]
-        
-        # DataFrame comparativo
-        comparison_df = pd.DataFrame({
-            'Feature': shap_norm.index,
-            'SHAP_Importance': shap_norm.values,
-            'LIME_Importance': lime_norm.values,
-            'Absolute_Difference': np.abs(shap_norm.values - lime_norm.values)
-        })
-        
-        print("\n📊 Convergência SHAP-LIME:")
-        print(f"   Correlação de Pearson: r = {correlation:.4f}")
-        
-        if correlation > 0.8:
-            print("   ✅ CONVERGÊNCIA FORTE (r > 0.8) - Modelo estável e confiável")
-        elif correlation > 0.6:
-            print("   ⚠️ CONVERGÊNCIA MODERADA (0.6 < r ≤ 0.8) - Interpretações parcialmente alinhadas")
+    print("=" * 78)
+    print(f"XAI TRIANGULATION — n = {len(X)} years")
+    print("=" * 78)
+
+    # 1. SHAP ---------------------------------------------------------------------
+    sv = shap.TreeExplainer(model).shap_values(Z)
+    shap_imp = pd.Series(np.abs(sv).mean(axis=0), index=FEATURES, name="SHAP")
+    (shap_imp.rename("importance").rename_axis("feature").reset_index()
+     .sort_values("importance", ascending=False)
+     .to_csv(TABLES / "shap_importance.csv", index=False))
+    plt.figure()
+    shap.summary_plot(sv, Z, feature_names=FEATURES, show=False)
+    plt.tight_layout()
+    plt.savefig(FIGURES / "shap_summary.png", dpi=300, bbox_inches="tight")
+    plt.close()
+
+    # 2. LIME ---------------------------------------------------------------------
+    explainer = LimeTabularExplainer(Z, feature_names=FEATURES, mode="regression",
+                                     discretize_continuous=False, random_state=SEED)
+    chosen = k_medoids(Z, N_LIME_INSTANCES, rng)
+    lime_rows = []
+    for i in chosen:
+        exp = explainer.explain_instance(Z[i], model.predict, num_features=len(FEATURES),
+                                         num_samples=LIME_SAMPLES)
+        weights = dict(exp.as_map()[1])
+        lime_rows.append({"year": int(df.loc[i, "year"]),
+                          **{FEATURES[j]: abs(weights.get(j, 0.0)) for j in range(len(FEATURES))}})
+    lime_df = pd.DataFrame(lime_rows)
+    lime_df.to_csv(TABLES / "lime_instance_explanations.csv", index=False)
+    lime_imp = lime_df[FEATURES].mean().rename("LIME")
+
+    # 3. Convergence ------------------------------------------------------------------
+    shap_n, lime_n = shap_imp / shap_imp.sum(), lime_imp / lime_imp.sum()
+    pr, pp = stats.pearsonr(shap_n, lime_n)
+    sr, sp = stats.spearmanr(shap_n, lime_n)
+    comp = pd.DataFrame({"SHAP_raw": shap_imp, "LIME_raw": lime_imp,
+                         "SHAP_share": shap_n, "LIME_share": lime_n})
+    comp["abs_diff_share"] = (comp["SHAP_share"] - comp["LIME_share"]).abs()
+    comp.sort_values("SHAP_share", ascending=False).to_csv(
+        TABLES / "shap_lime_comparison.csv", index_label="feature")
+    conv = {"pearson_r": pr, "pearson_p": pp, "spearman_rho": sr, "spearman_p": sp,
+            "n_features": len(FEATURES), "mean_abs_diff_share": comp["abs_diff_share"].mean(),
+            "lime_years": ",".join(map(str, lime_df["year"]))}
+    pd.DataFrame([conv]).to_csv(TABLES / "shap_lime_convergence.csv", index=False)
+    print("\n" + comp.round(4).to_string())
+    print(f"\nPearson r = {pr:.3f} (p = {pp:.3f}); Spearman ρ = {sr:.3f} (p = {sp:.3f}); "
+          f"df = {len(FEATURES) - 2} — descriptive only.")
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    x = np.arange(len(FEATURES))
+    ax.bar(x - 0.2, comp["SHAP_share"], 0.4, label="SHAP")
+    ax.bar(x + 0.2, comp["LIME_share"], 0.4, label="LIME")
+    ax.set_xticks(x, FEATURES, rotation=20, ha="right")
+    ax.set_ylabel("Share of total importance")
+    ax.set_title(f"SHAP vs LIME (Pearson r = {pr:.2f}, 4 features)")
+    ax.legend()
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(FIGURES / "shap_lime_convergence.png", dpi=300)
+    plt.close(fig)
+
+    # 4. DiCE counterfactuals -------------------------------------------------------------
+    try:
+        import dice_ml
+        frame = df[FEATURES + [TARGET]].copy()
+        data = dice_ml.Data(dataframe=frame, continuous_features=FEATURES, outcome_name=TARGET)
+        dmodel = dice_ml.Model(model=pipeline, backend="sklearn", model_type="regressor")
+        dice = dice_ml.Dice(data, dmodel, method="random")
+        last = df["year"].idxmax()
+        query = df.loc[[last], FEATURES]
+        pred = float(pipeline.predict(query)[0])
+        lo, hi = sorted([pred * 1.10, pred * 1.30])
+        cf = dice.generate_counterfactuals(query, total_CFs=5, desired_range=[lo, hi],
+                                           random_seed=SEED)
+        cfs = cf.cf_examples_list[0].final_cfs_df
+        if cfs is None or cfs.empty:
+            print("\nDiCE: no counterfactual found in the requested range.")
         else:
-            print("   ❌ CONVERGÊNCIA FRACA (r ≤ 0.6) - Modelo instável, revisar")
-        
-        print("\n" + comparison_df.to_string(index=False))
-        
-        # Salvar
-        convergence_report = {
-            'Pearson_Correlation': correlation,
-            'Convergence_Level': 'Strong' if correlation > 0.8 else 'Moderate' if correlation > 0.6 else 'Weak',
-            'Mean_Absolute_Difference': comparison_df['Absolute_Difference'].mean()
-        }
-        
-        pd.DataFrame([convergence_report]).to_csv(OUTPUTS_TABLES / "shap_lime_convergence.csv", index=False)
-        comparison_df.to_csv(OUTPUTS_TABLES / "shap_lime_comparison.csv", index=False)
-        
-        print("\n✅ Salvo: shap_lime_convergence.csv, shap_lime_comparison.csv")
-        
-        # Gráfico de convergência
-        plt.figure(figsize=(10, 6))
-        x = np.arange(len(comparison_df))
-        width = 0.35
-        
-        plt.bar(x - width/2, comparison_df['SHAP_Importance'], width, 
-               label='SHAP', alpha=0.8, color='#2E86AB')
-        plt.bar(x + width/2, comparison_df['LIME_Importance'], width,
-               label='LIME', alpha=0.8, color='#A23B72')
-        
-        plt.xlabel('Features', fontsize=12)
-        plt.ylabel('Normalized Importance', fontsize=12)
-        plt.title(f'SHAP vs LIME Convergence (r = {correlation:.3f})', 
-                 fontsize=14, fontweight='bold')
-        plt.xticks(x, comparison_df['Feature'], rotation=45, ha='right')
-        plt.legend(loc='best', fontsize=11)
-        plt.grid(axis='y', alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(OUTPUTS_FIGURES / "shap_lime_convergence.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        print("✅ Salvo: shap_lime_convergence.png")
-        
-        self.results['convergence'] = {
-            'correlation': correlation,
-            'comparison': comparison_df
-        }
-        
-        return convergence_report
-    
-    def dice_counterfactuals(self, target_year=2024):
-        """Gera contrafactuais DiCE para instância específica."""
-        print("\n" + "─" * 80)
-        print("4. DiCE COUNTERFACTUALS")
-        print("─" * 80)
-        
-        print(f"\n📊 Gerando contrafactuais para ano {target_year}...")
-        
-        # Encontrar instância do ano alvo
-        target_idx = self.df[self.df['year'] == target_year].index
-        
-        if len(target_idx) == 0:
-            print(f"⚠️ Ano {target_year} não encontrado, usando última instância")
-            target_idx = [len(self.X_scaled) - 1]
-        else:
-            target_idx = [target_idx[0]]
-        
-        instance = self.X_scaled[target_idx[0]]
-        current_prediction = self.model.predict([instance])[0]
-        
-        print(f"\n   Instância atual:")
-        for feat, val in zip(self.feature_names, instance):
-            print(f"     {feat}: {val:.4f}")
-        print(f"   Predição atual: {current_prediction:.4f}")
-        
-        # Simular contrafactuais (mudanças mínimas para melhorar score)
-        # Target: aumentar 10% o score
-        target_score = current_prediction * 1.10
-        
-        counterfactuals = []
-        
-        # Estratégia 1: Aumentar ESG Disclosure (+20%)
-        cf1 = instance.copy()
-        cf1[0] *= 1.2  # ESG_Disclosure_Index
-        cf1_pred = self.model.predict([cf1])[0]
-        counterfactuals.append({
-            'Strategy': 'Increase ESG Disclosure (+20%)',
-            'ESG_Disclosure_Index': cf1[0],
-            'Report_Quality_Score': cf1[1],
-            'Annual_Return_Pct': cf1[2],
-            'Market_Liquidity': cf1[3],
-            'Predicted_Score': cf1_pred,
-            'Delta_%': ((cf1_pred - current_prediction) / current_prediction) * 100,
-            'Feasibility': 'Alta'
-        })
-        
-        # Estratégia 2: Aumentar Report Quality (+15%)
-        cf2 = instance.copy()
-        cf2[1] *= 1.15  # Report_Quality_Score
-        cf2_pred = self.model.predict([cf2])[0]
-        counterfactuals.append({
-            'Strategy': 'Increase Report Quality (+15%)',
-            'ESG_Disclosure_Index': cf2[0],
-            'Report_Quality_Score': cf2[1],
-            'Annual_Return_Pct': cf2[2],
-            'Market_Liquidity': cf2[3],
-            'Predicted_Score': cf2_pred,
-            'Delta_%': ((cf2_pred - current_prediction) / current_prediction) * 100,
-            'Feasibility': 'Alta'
-        })
-        
-        # Estratégia 3: Combinar ESG (+10%) + Quality (+10%)
-        cf3 = instance.copy()
-        cf3[0] *= 1.10
-        cf3[1] *= 1.10
-        cf3_pred = self.model.predict([cf3])[0]
-        counterfactuals.append({
-            'Strategy': 'Combined: ESG+Quality (+10% each)',
-            'ESG_Disclosure_Index': cf3[0],
-            'Report_Quality_Score': cf3[1],
-            'Annual_Return_Pct': cf3[2],
-            'Market_Liquidity': cf3[3],
-            'Predicted_Score': cf3_pred,
-            'Delta_%': ((cf3_pred - current_prediction) / current_prediction) * 100,
-            'Feasibility': 'Média'
-        })
-        
-        # DataFrame
-        cf_df = pd.DataFrame(counterfactuals)
-        cf_df = cf_df.sort_values('Predicted_Score', ascending=False)
-        
-        print("\n📊 Counterfactuals gerados:")
-        print(cf_df[['Strategy', 'Predicted_Score', 'Delta_%', 'Feasibility']].to_string(index=False))
-        
-        # Salvar
-        cf_df.to_csv(OUTPUTS_TABLES / "dice_counterfactuals.csv", index=False)
-        print("\n✅ Salvo: dice_counterfactuals.csv")
-        
-        self.results['counterfactuals'] = cf_df
-        return cf_df
-    
-    def generate_xai_summary_report(self):
-        """Gera relatório consolidado de XAI."""
-        print("\n" + "═" * 80)
-        print("RELATÓRIO RESUMO XAI")
-        print("═" * 80)
-        
-        report = []
-        report.append("=" * 80)
-        report.append("ANÁLISE XAI TRIANGULADA - TECK RESOURCES")
-        report.append("=" * 80)
-        
-        # Top feature (SHAP)
-        if 'shap' in self.results:
-            top_shap = self.results['shap']['importance'].iloc[0]
-            report.append(f"\n1. SHAP (Global):")
-            report.append(f"   Feature mais importante: {top_shap['feature']}")
-            report.append(f"   Importância: {top_shap['importance']:.4f}")
-        
-        # Convergência SHAP-LIME
-        if 'convergence' in self.results:
-            corr = self.results['convergence']['correlation']
-            report.append(f"\n2. Convergência SHAP-LIME:")
-            report.append(f"   Correlação de Pearson: r = {corr:.4f}")
-            if corr > 0.8:
-                report.append("   ✅ Modelo estável e interpretável")
-            else:
-                report.append("   ⚠️ Interpretações divergentes - revisar modelo")
-        
-        # Counterfactuals
-        if 'counterfactuals' in self.results:
-            best_cf = self.results['counterfactuals'].iloc[0]
-            report.append(f"\n3. DiCE Counterfactuals:")
-            report.append(f"   Melhor estratégia: {best_cf['Strategy']}")
-            report.append(f"   Ganho esperado: +{best_cf['Delta_%']:.2f}%")
-            report.append(f"   Viabilidade: {best_cf['Feasibility']}")
-        
-        report.append("\n" + "=" * 80)
-        
-        # Salvar
-        report_text = "\n".join(report)
-        with open(OUTPUTS_TABLES / "xai_summary_report.txt", 'w', encoding='utf-8') as f:
-            f.write(report_text)
-        
-        print(report_text)
-        print("\n✅ Relatório salvo: xai_summary_report.txt")
+            sd = df[FEATURES].std(ddof=1)
+            diff = (cfs[FEATURES] - query.iloc[0]) / sd
+            cfs = cfs.assign(
+                sparsity=(diff.abs() > 1e-9).sum(axis=1),
+                proximity_sd=diff.abs().mean(axis=1),
+                **{f"{f}_change_%": (cfs[f] / query.iloc[0][f] - 1) * 100 for f in FEATURES},
+            )
+            cfs.insert(0, "query_year", int(df.loc[last, "year"]))
+            cfs.insert(1, "query_prediction", pred)
+            cfs.to_csv(TABLES / "dice_counterfactuals.csv", index=False)
+            print(f"\nDiCE: {len(cfs)} counterfactuals for {int(df.loc[last, 'year'])} "
+                  f"(prediction {pred:,.2f} → [{lo:,.2f}, {hi:,.2f}])")
+            print(cfs.round(3).to_string(index=False))
+    except Exception as exc:  # report, never fabricate
+        print(f"\nDiCE could not be run: {exc}")
 
+    print("\nSaved: SHAP/LIME tables and figures, convergence metrics (and DiCE table if found).")
 
-# ════════════════════════════════════════════════════════════════════════════
-# EXECUÇÃO
-# ════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    data_path = DATA_PROCESSED / "esge_master.csv"
-    model_path = OUTPUTS_MODELS / "xgb_model_tuned.pkl"
-    
-    if not data_path.exists() or not model_path.exists():
-        print(f"❌ ERRO: Arquivos não encontrados")
-        print(f"   Data: {data_path.exists()}")
-        print(f"   Model: {model_path.exists()}")
-        sys.exit(1)
-    
-    # Criar pipeline
-    xai = XAITriangulation(data_path, model_path)
-    
-    # Executar
-    xai.shap_global_importance()
-    xai.lime_local_explanations(n_samples=10)
-    xai.shap_lime_convergence()
-    xai.dice_counterfactuals(target_year=2024)
-    xai.generate_xai_summary_report()
-    
-    print("\n" + "═" * 80)
-    print("✅ XAI TRIANGULAÇÃO CONCLUÍDA!")
-    print("═" * 80)
-    print("\nPróximo passo: Execute 04_ahp_sensitivity_analysis.py")
+    main()

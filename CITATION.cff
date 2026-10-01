@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "XAI-AHP-Gaussian ESGE Framework: explainable ML and Gaussian AHP for longitudinal ESG analysis (Teck Resources, 2001-2024)"
+type: software
+authors:
+  - family-names: "Pedroza"
+    given-names: "Cesar Yoshio Machado"
+repository-code: "https://github.com/cypedroza/teck-esge-xai"
+license: MIT
+version: "1.1.0"
+date-released: "2026-10-01"
+keywords:
+  - explainable AI
+  - SHAP
+  - LIME
+  - Gaussian AHP
+  - ESG
+  - mining

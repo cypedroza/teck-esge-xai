@@ -9,7 +9,7 @@ Modify paths, hyperparameters, and settings here.
 
 Author: Cesar Yoshio Machado Pedroza
 Institution: USP/Esalq - MBA Data Science and Analytics
-Last Updated: 2026-04-16
+Last Updated: 2026-10-01
 ═══════════════════════════════════════════════════════════════════════════════
 """
 
@@ -66,6 +66,22 @@ class ESGEConfig:
     TICKER: str = "TECK-B.TO"  # Teck Resources ticker (Toronto Stock Exchange)
     START_YEAR: int = 2001      # First year of analysis
     END_YEAR: int = 2024        # Last year of analysis
+
+    # Market benchmark (real data via Yahoo Finance; never simulated)
+    BENCHMARK_TICKER: str = "^GSPTSE"   # S&P/TSX Composite Index
+    BENCHMARK_NAME: str = "S&P/TSX Composite"
+    PRICE_START: str = "2000-01-01"     # extra history for the first annual return
+    PRICE_END: str = "2025-01-01"       # exclusive upper bound (covers 2024)
+    RISK_FREE_RATE: float = 0.03        # annual, decimal (see README: published text says 2%)
+
+    # Event analysis (Mount Polley tailings breach — an Imperial Metals operation)
+    EVENT_NAME: str = "Mount Polley tailings breach (Imperial Metals)"
+    EVENT_DATE: str = "2014-08-04"
+    EVENT_YEAR: int = 2014
+
+    # Datasets
+    MASTER_FILE: str = "esge_master.csv"          # features + financials (notebook 02)
+    MODELLING_FILE: str = "esge_master_final.csv"  # adds the ESGE_score target
     
     # ═══════════════════════════════════════════════════════════════════════
     # MACHINE LEARNING PARAMETERS
@@ -98,6 +114,20 @@ class ESGEConfig:
     NOISE_STD: float = 0.1      # Gaussian noise standard deviation
     CR_THRESHOLD: float = 0.10  # Consistency Ratio threshold (Saaty, 1980)
     
+    SIGMA_LEVELS: List[float] = field(default_factory=lambda: [0.05, 0.10, 0.15, 0.20])
+
+    # Pairwise judgments (Saaty 1–9 scale), defined a priori by the author from
+    # the mining-sector ESG literature (no expert panel). Order: E, S, G, Ec.
+    AHP_CRITERIA: List[str] = field(default_factory=lambda: [
+        'Environmental (E)', 'Social (S)', 'Governance (G)', 'Economic (Ec)'
+    ])
+    AHP_PAIRWISE: List[List[float]] = field(default_factory=lambda: [
+        [1.0,     3.0,     5.0,     7.0],
+        [1 / 3.0, 1.0,     3.0,     5.0],
+        [1 / 5.0, 1 / 3.0, 1.0,     3.0],
+        [1 / 7.0, 1 / 5.0, 1 / 3.0, 1.0],
+    ])
+
     # Random Index values (Saaty, 1980)
     RANDOM_INDEX: Dict[int, float] = field(default_factory=lambda: {
         1: 0.00, 2: 0.00, 3: 0.58, 4: 0.90, 5: 1.12,
@@ -171,21 +201,21 @@ class ESGEConfig:
         ]:
             directory.mkdir(parents=True, exist_ok=True)
         
-        # Configure logging
+        # Configure logging (file logging only if ESGE_LOG_FILE=1)
         self._setup_logging()
     
     def _setup_logging(self):
         """Configure logging for the entire project."""
-        log_file = self.OUTPUTS_LOGS / f"esge_framework_{self.get_timestamp()}.log"
-        
+        handlers = [logging.StreamHandler(sys.stdout)]
+        if os.environ.get("ESGE_LOG_FILE") == "1":
+            log_file = self.OUTPUTS_LOGS / f"esge_framework_{self.get_timestamp()}.log"
+            handlers.append(logging.FileHandler(log_file, encoding='utf-8'))
+
         logging.basicConfig(
             level=self.LOG_LEVEL,
             format=self.LOG_FORMAT,
             datefmt=self.LOG_DATE_FORMAT,
-            handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
-                logging.StreamHandler(sys.stdout)
-            ]
+            handlers=handlers
         )
         
         # Suppress noisy third-party loggers

@@ -44,7 +44,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://github.com/cesarpedroza/teck-esge-xai',
+        'Get Help': 'https://github.com/cypedroza/teck-esge-xai',
         'Report a bug': 'mailto:cesar.pedroza@usp.br',
         'About': "XAI-AHP-Gaussian ESGE Framework | USP/Esalq 2026"
     }
@@ -103,22 +103,18 @@ def load_data() -> tuple:
         (df_master, df_ahp, df_shap, df_financial)
     """
     try:
-        df_master = pd.read_csv(config.DATA_PROCESSED / "esge_master.csv")
-        df_ahp = pd.read_csv(config.OUTPUTS_DIR / "ahp_weights.csv")
-        
-        # Try to load SHAP, fallback to dummy if not available
-        try:
-            df_shap = pd.read_csv(config.OUTPUTS_DIR / "shap_importance.csv")
-        except:
-            df_shap = pd.DataFrame({
-                'feature': df_master.columns[1:5],
-                'importance': [0.334, 0.272, 0.218, 0.177]
-            })
-        
-        return df_master, df_ahp, df_shap
-    except Exception as e:
-        st.error(f"❌ Erro ao carregar dados: {e}")
+        df_master = pd.read_csv(config.DATA_PROCESSED / config.MASTER_FILE)
+        df_ahp = pd.read_csv(config.OUTPUTS_TABLES / "ahp_weights.csv")
+    except FileNotFoundError as e:
+        st.error(f"❌ Arquivo não encontrado: {e.filename}. "
+                 "Execute os scripts 01–05 antes de abrir o DSS (ver README).")
         st.stop()
+
+    # SHAP importance is optional: if script 03 has not been run, the panel is hidden.
+    shap_path = config.OUTPUTS_TABLES / "shap_importance.csv"
+    df_shap = (pd.read_csv(shap_path) if shap_path.exists()
+               else pd.DataFrame(columns=["feature", "importance"]))
+    return df_master, df_ahp, df_shap
 
 # Load data
 df_master, df_ahp, df_shap = load_data()
@@ -128,8 +124,7 @@ df_master, df_ahp, df_shap = load_data()
 # ═══════════════════════════════════════════════════════════════════════════
 
 with st.sidebar:
-    st.image("https://via.placeholder.com/200x80/1f77b4/ffffff?text=ESGE+DSS", 
-             use_column_width=True)
+    st.markdown("### ESGE DSS")
     
     st.markdown("---")
     
@@ -298,7 +293,9 @@ if page == "🏠 Dashboard Executivo":
     
     with col2:
         st.subheader("🔍 Importância das Features (SHAP)")
-        
+        if df_shap.empty:
+            st.warning("SHAP ainda não calculado — execute 03_xai_triangulation_convergence.py.")
+
         fig4 = px.bar(
             df_shap.head(10),
             y='feature',
@@ -373,16 +370,16 @@ elif page == "🔍 Análise XAI":
         st.plotly_chart(fig_shap, use_container_width=True)
     
     with col2:
-        st.info("""
+        top_feature = df_shap.iloc[0]["feature"] if not df_shap.empty else "—"
+        st.info(f"""
         **📊 Interpretação SHAP:**
-        
-        Valores mais altos indicam maior influência no modelo.
-        
-        **Dimensão dominante:**  
-        Environmental (E)
-        
-        **Fundamento:**  
-        TreeExplorer otimizado para modelos baseados em árvores.
+
+        Valores mais altos indicam maior influência no modelo
+        (não necessariamente relação causal).
+
+        **Feature dominante:** {top_feature}
+
+        **Fundamento:** TreeExplainer (SHAP exato para modelos de árvores).
         """)
     
     st.markdown("---")
@@ -582,7 +579,7 @@ elif page == "📈 Análise Financeira":
     🚧 **Em desenvolvimento**: Análise de eventos críticos.
     
     **Eventos planejados:**
-    1. Rompimento da barragem Mount Polley (2014)
+    1. Rompimento da barragem Mount Polley (2014, operação da Imperial Metals)
     2. UN Climate Summit (2019)
     3. COVID-19 Crash (2020)
     
@@ -598,6 +595,6 @@ st.markdown("""
 <div style='text-align: center; color: #666; padding: 2rem 0;'>
     <p><strong>XAI-AHP-Gaussian ESGE Framework</strong></p>
     <p>Desenvolvido por Cesar Yoshio Machado Pedroza | USP/Esalq | 2026</p>
-    <p>📧 cesar.pedroza@usp.br | 🐙 github.com/cesarpedroza/teck-esge-xai</p>
+    <p>📧 cesar.pedroza@usp.br | 🐙 github.com/cypedroza/teck-esge-xai</p>
 </div>
 """, unsafe_allow_html=True)
