@@ -18,10 +18,11 @@
 
 These are proxies with partial coverage of each dimension; see the article's limitations section.
 
-## Note on `ESGE_score`
+## Note on `ESGE_score` (modelling target)
 
-`ESGE_score` is the composite score used as the prediction target. Its exact
-construction must be documented here before the modelling results are cited.
-Script 02 checks whether it is (almost) a linear combination of the four
-features — if it is, model R² values measure the reproduction of a formula,
-not predictive ability.
+The target used in earlier runs (`esge_master_final.csv`) had `E_score`,
+`S_score` and `G_score` equal to zero in every year, so `ESGE_score` was
+exactly 0.25 × `Ec_score`, a price/return-derived variable. That file also
+lacked the trading-volume column the models use. The ML/XAI modules (02, 03)
+are therefore suspended until a new target is defined, documented here and
+built by a script in this repository.

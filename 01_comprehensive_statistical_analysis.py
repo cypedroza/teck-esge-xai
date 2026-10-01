@@ -539,11 +539,7 @@ class ComprehensiveStatisticalAnalysis:
 
 if __name__ == "__main__":
     # Carregar dados
-    # Prefer the final dataset (same features plus ESGE_score); fall back to the
-    # extraction output. The file actually used is printed for traceability.
-    data_path = DATA_PROCESSED / config.MODELLING_FILE
-    if not data_path.exists():
-        data_path = DATA_PROCESSED / config.MASTER_FILE
+    data_path = DATA_PROCESSED / config.MASTER_FILE
     print(f"Dataset: {data_path.name}")
     
     if not data_path.exists():

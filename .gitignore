@@ -159,3 +159,6 @@ outputs/lime_explanation_*.html
 !outputs/models/.gitkeep
 !outputs/logs/.gitkeep
 !powerbi_data/.gitkeep
+
+# Legacy outputs kept locally for the audit trail only (not published)
+data/legacy/

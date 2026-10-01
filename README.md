@@ -23,6 +23,8 @@ teck-esge-xai/
 ├── 03_xai_triangulation_convergence.py        # SHAP, LIME (k-medoids instances), SHAP–LIME convergence, DiCE
 ├── 04_ahp_sensitivity_analysis.py             # Gaussian AHP, σ ∈ {0.05,…,0.20}, P(CR<0.10), rank reversal
 ├── 05_financial_benchmarking_tsx.py           # Teck vs ^GSPTSE metrics, Mount Polley event analysis
+├── run_pipeline.py                            # runs the scripts in order
+├── CLAUDE.md                                  # rules for AI assistants (data integrity, verification)
 ├── src/
 │   ├── config.py      # paths (relative), seeds, parameters, AHP judgment matrix
 │   ├── data_io.py     # loading, column names, target-circularity check
@@ -48,14 +50,13 @@ cd teck-esge-xai
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 
-# 1) data: place the reports in data/raw/ and run notebooks/02_data_extraction.ipynb
-#    (or use the versioned datasets in data/processed/, when available)
-# 2) analysis
-python 01_comprehensive_statistical_analysis.py
-python 02_ml_advanced_validation.py
-python 03_xai_triangulation_convergence.py
-python 04_ahp_sensitivity_analysis.py
-python 05_financial_benchmarking_tsx.py      # downloads and caches ^GSPTSE and TECK-B.TO prices
+# 1) data: data/processed/esge_master.csv is versioned; to rebuild it, place the
+#    reports in data/raw/ and run notebooks/02_data_extraction.ipynb
+# 2) analysis (runs 01 → 04 → 05 and stops at the first error)
+python run_pipeline.py
+#    05 downloads and caches ^GSPTSE and TECK-B.TO prices on first run
+#    02 → 03 (ML/XAI) are suspended until a validated target is defined:
+#    python run_pipeline.py --with-ml
 # 3) dashboard
 streamlit run app/streamlit_app.py
 
