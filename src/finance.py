@@ -2,7 +2,7 @@
 Financial metrics and event-study utilities.
 
 All functions are pure (no I/O) except ``load_prices``, which downloads
-adjusted prices from Yahoo Finance and caches them under ``data/raw``.
+prices from Yahoo Finance and caches them under ``data/raw``.
 
 Design rules
 ------------
@@ -35,8 +35,14 @@ def load_prices(
     end: str,
     cache_dir: Path,
     refresh: bool = False,
+    adjusted: bool = True,
 ) -> pd.Series:
-    """Daily dividend/split-adjusted close prices for ``ticker``.
+    """Daily close prices for ``ticker``.
+
+    ``adjusted=True`` returns dividend- and split-adjusted closes (total
+    return); ``adjusted=False`` returns closes adjusted for splits only (price
+    return), which is the right basis for comparing a stock with a price index
+    such as ^GSPTSE, which excludes dividends.
 
     The first successful download is cached as CSV so that later runs (and
     other researchers) use exactly the same series. Delete the cache file or
@@ -50,7 +56,8 @@ def load_prices(
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe = ticker.replace("^", "IDX_").replace(".", "_")
-    cache_file = cache_dir / f"prices_{safe}_{start}_{end}.csv"
+    kind = "" if adjusted else "_priceonly"
+    cache_file = cache_dir / f"prices_{safe}{kind}_{start}_{end}.csv"
 
     if cache_file.exists() and not refresh:
         s = pd.read_csv(cache_file, index_col=0, parse_dates=True).iloc[:, 0]
@@ -62,7 +69,7 @@ def load_prices(
     except ImportError as exc:  # pragma: no cover - environment issue
         raise RuntimeError("yfinance is required: pip install yfinance") from exc
 
-    hist = yf.Ticker(ticker).history(start=start, end=end, auto_adjust=True)
+    hist = yf.Ticker(ticker).history(start=start, end=end, auto_adjust=adjusted)
     if hist is None or hist.empty:
         raise RuntimeError(
             f"No price data returned for {ticker}. Check the ticker and your "

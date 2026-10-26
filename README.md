@@ -74,8 +74,8 @@ figures to `outputs/figures/`.
 | Explanatory model | Target: log(1 + ESG Disclosure Index), the article's central variable, not built from the features (checked by an OLS circularity test). Features: report length, market liquidity, annual return, year-end price. Mean and linear baselines, Random Forest and XGBoost tuned by leave-one-out. Leave-one-out R² is the headline out-of-sample metric; TimeSeriesSplit R² is also reported and is strongly negative because of the 2018 break, so the module is explanatory rather than predictive; out-of-bag bootstrap intervals. |
 | XAI | SHAP `TreeExplainer` (global mean \|φ\|); LIME on 10 k-medoids years with 1,000 perturbations each; Pearson and Spearman agreement between normalised importances (4 features, df = 2: descriptive only); DiCE counterfactuals (random sampling — gradient-based DiCE does not apply to tree ensembles) with sparsity and proximity. |
 | Gaussian AHP | 4×4 Saaty matrix (E > S > G > Ec) set a priori by the author; each upper-triangular judgment multiplied by N(1, σ²); diagonal fixed at 1, lower triangle reciprocal; 10,000 simulations per σ. |
-| Finance | Annual returns from year-end adjusted closes (Yahoo Finance) for TECK-B.TO and ^GSPTSE; Sharpe, Sortino, VaR/CVaR 95%, max drawdown, beta, Treynor (risk-free rate in `config.py`); paired and Welch t-tests. |
-| Event analysis | Mount Polley tailings breach, 4 Aug 2014 — an **Imperial Metals** operation, not a Teck asset. (a) Daily market model, estimation window −260…−11 trading days, event window 0…+2, CAR t-test; (b) annual mean-adjusted abnormal return as an exploratory check. Events are located by date/year label, never by array position. |
+| Finance | Annual returns from year-end closes (Yahoo Finance). ^GSPTSE is a price index (no dividends), so the main comparison is **price vs price**: TECK-B.TO closes adjusted for splits only vs ^GSPTSE, 2001–2024. A **total-return check** compares dividend-adjusted TECK-B.TO with XIC.TO (S&P/TSX Capped Composite ETF, distributions reinvested), 2002–2024. Sharpe, Sortino, VaR/CVaR 95%, max drawdown, annual and daily beta, Treynor (risk-free rate in `config.py`); paired and Welch t-tests. |
+| Event analysis | Mount Polley tailings breach, 4 Aug 2014 — an **Imperial Metals** operation, not a Teck asset. (a) Daily market model, estimation window −260…−11 trading days, event window 0…+2, CAR t-test; market = ^GSPTSE, with XIC.TO as a robustness check; the TSX was closed on 4 Aug 2014 (Civic Holiday), so day 0 is 5 Aug; (b) annual mean-adjusted abnormal return as an exploratory check. Events are located by date/year label, never by array position. |
 
 ## Revision history
 
@@ -84,7 +84,9 @@ benchmark is now downloaded from Yahoo Finance (`^GSPTSE`) and cached, and the p
 simulating data if the download fails; the event analysis locates the event year by label and adds the daily
 market-model design; bootstrap intervals are now out-of-bag; LIME and DiCE are implemented as described in the
 methods; the Gaussian AHP keeps the matrix diagonal at 1; unit tests added; exploratory notebooks moved to
-`notebooks/legacy/`. Numerical results produced by this version may differ from earlier outputs.
+`notebooks/legacy/`. The benchmark compares like with like (price vs price, plus a total-return check), since the
+earlier code set dividend-adjusted Teck returns against a price index. Numerical results produced by this version
+may differ from earlier outputs.
 
 ## How to cite
 

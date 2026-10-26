@@ -66,3 +66,18 @@ def test_daily_market_model_recovers_parameters_and_event():
     assert res.abnormal_return_t0 == pytest.approx(-0.05, abs=0.01)
     assert res.p_value_car < 0.05
     assert len(table) == 3
+
+
+def test_load_prices_keeps_price_and_total_return_caches_apart(tmp_path):
+    # Two cached series for the same ticker: one split-only, one dividend-adjusted.
+    # The loader must read each from its own file (no network access involved).
+    from finance import load_prices
+    idx = pd.to_datetime(["2001-12-31", "2002-12-31"])
+    pd.DataFrame({"Close": [10.0, 11.0]}, index=idx).to_csv(
+        tmp_path / "prices_TECK-B_TO_priceonly_2000-01-01_2025-01-01.csv")
+    pd.DataFrame({"Close": [10.0, 12.0]}, index=idx).to_csv(
+        tmp_path / "prices_TECK-B_TO_2000-01-01_2025-01-01.csv")
+    price = load_prices("TECK-B.TO", "2000-01-01", "2025-01-01", tmp_path, adjusted=False)
+    total = load_prices("TECK-B.TO", "2000-01-01", "2025-01-01", tmp_path, adjusted=True)
+    assert price.iloc[-1] == pytest.approx(11.0)
+    assert total.iloc[-1] == pytest.approx(12.0)

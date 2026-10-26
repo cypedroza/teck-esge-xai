@@ -3,7 +3,7 @@
 | File | Produced by | Contents |
 |---|---|---|
 | `raw/Teck_YYYY.pdf` | downloaded manually from Teck's website | 24 annual / sustainability reports (2001–2024). Not versioned (copyright, size). |
-| `raw/prices_*.csv` | `05_financial_benchmarking_tsx.py` (first run) | Daily adjusted closes for `TECK-B.TO` and `^GSPTSE` from Yahoo Finance, cached so every later run uses the same series. Not versioned (Yahoo terms); delete them or run with `--refresh` to re-download. |
+| `raw/prices_*.csv` | `05_financial_benchmarking_tsx.py` (first run) | Daily closes from Yahoo Finance: `TECK-B.TO` split-adjusted only (`*_priceonly_*`) and dividend-adjusted, `^GSPTSE`, and `XIC.TO` (dividend-adjusted), cached so every later run uses the same series. Not versioned (Yahoo terms); delete them or run with `--refresh` to re-download. |
 | `processed/esge_master.csv` | `notebooks/02_data_extraction.ipynb` | One row per year: `year`, `char_count` (report length), `esg_disclosure_score` (anchor-term count), `close_price`, `volume` (mean daily volume), `annual_return_%`. |
 | `processed/esge_master_final.csv` | see note below | Same columns plus the modelling target `ESGE_score`. Required by scripts 02 and 03. |
 

@@ -70,6 +70,12 @@ class ESGEConfig:
     # Market benchmark (real data via Yahoo Finance; never simulated)
     BENCHMARK_TICKER: str = "^GSPTSE"   # S&P/TSX Composite Index
     BENCHMARK_NAME: str = "S&P/TSX Composite"
+    # The index above is a price index (no dividends). The main comparison
+    # therefore uses Teck price returns; a total-return check compares Teck
+    # with dividends against an ETF that tracks the index with distributions.
+    TOTAL_RETURN_BENCHMARK_TICKER: str = "XIC.TO"  # iShares Core S&P/TSX Capped Composite
+    TOTAL_RETURN_BENCHMARK_NAME: str = "XIC (S&P/TSX Capped, total return)"
+    TOTAL_RETURN_START_YEAR: int = 2002  # XIC began trading in Feb 2001: first year-end-to-year-end return is 2002
     PRICE_START: str = "2000-01-01"     # extra history for the first annual return
     PRICE_END: str = "2025-01-01"       # exclusive upper bound (covers 2024)
     RISK_FREE_RATE: float = 0.03        # annual, decimal (see README: published text says 2%)
