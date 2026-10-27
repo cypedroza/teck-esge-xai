@@ -34,6 +34,8 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from config import config
 
+RESULTS_SNAPSHOT = Path(__file__).parent / "results"
+
 # ═══════════════════════════════════════════════════════════════════════════
 # PAGE CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
@@ -102,16 +104,23 @@ def load_data() -> tuple:
     tuple
         (df_master, df_ahp, df_shap, df_financial)
     """
+    # Result tables come from a local pipeline run (outputs/tables). When that
+    # folder is empty (e.g. on Streamlit Community Cloud), the app falls back to
+    # the snapshot in app/results, produced by the same scripts (see its README).
+    def result(name: str) -> Path:
+        local = config.OUTPUTS_TABLES / name
+        return local if local.exists() else RESULTS_SNAPSHOT / name
+
     try:
         df_master = pd.read_csv(config.DATA_PROCESSED / config.MASTER_FILE)
-        df_ahp = pd.read_csv(config.OUTPUTS_TABLES / "ahp_weights.csv")
+        df_ahp = pd.read_csv(result("ahp_weights.csv"))
     except FileNotFoundError as e:
         st.error(f"❌ Arquivo não encontrado: {e.filename}. "
                  "Execute os scripts 01–05 antes de abrir o DSS (ver README).")
         st.stop()
 
     # SHAP importance is optional: if script 03 has not been run, the panel is hidden.
-    shap_path = config.OUTPUTS_TABLES / "shap_importance.csv"
+    shap_path = result("shap_importance.csv")
     df_shap = (pd.read_csv(shap_path) if shap_path.exists()
                else pd.DataFrame(columns=["feature", "importance"]))
     return df_master, df_ahp, df_shap
@@ -576,14 +585,14 @@ elif page == "📈 Análise Financeira":
     st.subheader("🎯 Event Studies")
     
     st.info("""
-    🚧 **Em desenvolvimento**: Análise de eventos críticos.
-    
-    **Eventos planejados:**
-    1. Rompimento da barragem Mount Polley (2014, operação da Imperial Metals)
-    2. UN Climate Summit (2019)
-    3. COVID-19 Crash (2020)
-    
-    **Metodologia:** Cumulative Abnormal Returns (CAR) com janela de 11 dias.
+    **Rompimento da barragem de Mount Polley (04/08/2014, operação da Imperial Metals, não da Teck).**
+
+    **Metodologia:** modelo de mercado diário (OLS), janela de estimação de −260 a −11 pregões,
+    janela do evento de 0 a +2 pregões; mercado = S&P/TSX Composite (^GSPTSE), com XIC.TO como
+    verificação. A bolsa de Toronto não abriu em 04/08/2014, então o dia 0 é 05/08/2014.
+
+    Os resultados são gerados pelo script `05_financial_benchmarking_tsx.py` a partir dos preços
+    reais do Yahoo Finance.
     """)
 
 # ═══════════════════════════════════════════════════════════════════════════

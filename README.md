@@ -36,6 +36,7 @@ teck-esge-xai/
 │   ├── 06_powerbi_export.ipynb    # star schema for Power BI
 │   └── legacy/                    # early exploratory notebooks, superseded (see legacy/README.md)
 ├── app/streamlit_app.py           # decision-support dashboard
+├── app/results/                   # result snapshot used by the app when outputs/ is empty
 ├── tests/                         # unit tests for finance, AHP and data checks
 ├── data/README.md                 # data sources and variable definitions
 ├── requirements.txt / requirements-dev.txt
@@ -95,7 +96,7 @@ See [`CITATION.cff`](CITATION.cff) (GitHub shows a "Cite this repository" button
 ## Author
 
 Cesar Yoshio Machado Pedroza — MBA in Data Science and Analytics, USP/Esalq ·
-[GitHub @cypedroza](https://github.com/cypedroza) · [LinkedIn](https://www.linkedin.com/in/cesar-y-mpedroza)
+[GitHub @cypedroza](https://github.com/cypedroza) · [LinkedIn](https://www.linkedin.com/in/cesar-y-m-pedroza)
 
 ## License
 
