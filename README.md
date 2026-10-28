@@ -37,6 +37,7 @@ teck-esge-xai/
 │   └── legacy/                    # early exploratory notebooks, superseded (see legacy/README.md)
 ├── app/streamlit_app.py           # decision-support dashboard
 ├── app/results/                   # result snapshot used by the app when outputs/ is empty
+├── .streamlit/config.toml         # dashboard theme
 ├── tests/                         # unit tests for finance, AHP and data checks
 ├── data/README.md                 # data sources and variable definitions
 ├── requirements.txt / requirements-dev.txt
@@ -56,7 +57,7 @@ pip install -r requirements-dev.txt
 # 2) analysis (runs 01 → 04 → 05 and stops at the first error)
 python run_pipeline.py
 #    01 → 02 → 03 → 04 → 05; script 05 downloads and caches ^GSPTSE and TECK-B.TO prices
-# 3) dashboard
+# 3) dashboard (Portuguese/English); live version: https://teck-esge-xai.streamlit.app
 streamlit run app/streamlit_app.py
 
 # tests
