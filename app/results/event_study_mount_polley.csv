@@ -1,0 +1,4 @@
+method,event,estimation_window,event_window,n_estimation,alpha,beta,abnormal_return_t0,car,t_stat_car,p_value_car
+"market model, daily (OLS)",Mount Polley tailings breach (Imperial Metals) (2014-08-04; day 0 = 2014-08-05),"[-260, -11] trading days","[0, 2] trading days",250,-0.0008002601211384203,1.8901513335940288,0.003843861088074884,-0.008361549771104239,-0.28435658144697273,0.7763744131270953
+"market model, daily (OLS)",Mount Polley tailings breach (Imperial Metals) — market: XIC.TO (2014-08-04; day 0 = 2014-08-05),"[-260, -11] trading days","[0, 2] trading days",250,-0.0009680595092648984,1.8413304150848793,0.005930865777124366,-0.006143952146217632,-0.20683852764157115,0.836305687373359
+"mean-adjusted, annual",Mount Polley tailings breach (Imperial Metals) (2014),2009–2013,2014–2016,5,1.0461050578223692,,-1.4425329897784542,-0.13393678958983113,-0.030518677389965505,0.9771154322439348
